@@ -1,3 +1,6 @@
+// Copyright (c) Turbos Finance, Inc.
+// SPDX-License-Identifier: MIT
+
 module turbos_assets_manage::strategy {
     use sui::object::{Self, UID, ID};
     use sui::table::{Self, Table};
@@ -11,6 +14,9 @@ module turbos_assets_manage::strategy {
     use turbos_clmm::position_nft::{Self, TurbosPositionNFT};
     use turbos_assets_manage::vault::{Self, Vault};
     use turbos_clmm::pool::{Self, Pool, Versioned};
+    use turbos_assets_manage::config::{Self, GlobalConfig, OperatorCap};
+
+    friend turbos_assets_manage::router;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
     const EInvalidAmount: u64 = 1;
@@ -35,18 +41,16 @@ module turbos_assets_manage::strategy {
         transfer::transfer(StrategyAdminCap { id: object::new(ctx) }, tx_context::sender(ctx));
     }
 
-    entry public fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
-        clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
-        ctx: &mut TxContext
-    ) {
-        let strategy = create_strategy_with_return(clmm_pool, ctx);
-        transfer::public_share_object(strategy)
-    }
-
-    public fun create_strategy_with_return<CoinTypeA, CoinTypeB, FeeType>(
+    public(friend) fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
         clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
         ctx: &mut TxContext
     ): Strategy<CoinTypeA, CoinTypeB> {
+        config::checked_package_version(global_config);
+        let operator_address = object::id_address<OperatorCap>(operator_cap);
+        config::check_vault_manager_role(global_config, operator_address);
+
         let clmm_pool_id = object::id(clmm_pool);
         let coin_a_type_name = type_name::get<CoinTypeA>();
         let coin_b_type_name = type_name::get<CoinTypeB>();
