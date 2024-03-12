@@ -8,8 +8,7 @@ module turbos_assets_manage::router {
     use turbos_clmm::i32::{Self, I32};
     use sui::coin::{Self, Coin};
     use turbos_assets_manage::config::{Self, AdminCap, GlobalConfig, OperatorCap};
-    use turbos_assets_manage::strategy::{Self, Strategy};
-    use turbos_assets_manage::vault::{Self, Vault, VaultManager};
+    use turbos_assets_manage::vault::{Self, Vault, Strategy};
     use turbos_clmm::pool::{Self, Pool, Versioned, PoolRewardVault};
     use turbos_clmm::position_manager::{Self, Positions};
     use sui::clock::{Self, Clock};
@@ -30,40 +29,26 @@ module turbos_assets_manage::router {
         config::add_operator(admin_cap, config, role, operator_address, tx_context);
     }
 
-    entry public fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
+    entry fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
         ctx: &mut TxContext
     ) {
-        let strategy = strategy::create_strategy(
-            operator_cap,
-            global_config,
-            clmm_pool, 
-            ctx
-        );
-        transfer::public_share_object(strategy)
-    }
-
-    entry fun create_vault_manager<CoinTypeA, CoinTypeB>(
-        operator_cap: &OperatorCap,
-        global_config: &GlobalConfig,
-        ctx: &mut TxContext
-    ) {
         let sender = tx_context::sender(ctx);
-        let vault_manager = vault::create_vault_manager<CoinTypeA, CoinTypeB>(
+        let strategy = vault::create_strategy<CoinTypeA, CoinTypeB, FeeType>(
             operator_cap,
             global_config,
+            clmm_pool,
             ctx,
         );
 
-        transfer::public_transfer(vault_manager, sender)
+        transfer::public_transfer(strategy, sender)
     }
 
     entry public fun open_vault<CoinTypeA, CoinTypeB>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
-        strategy: &Strategy<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         base_lower_index: u32,
         base_lower_index_is_neg: bool,
         base_upper_index: u32,
@@ -75,8 +60,7 @@ module turbos_assets_manage::router {
         let base_upper_index_i32 = i32::from_u32_neg(base_upper_index, base_upper_index_is_neg);
         let vault = vault::open_vault(
             global_config,
-            vault_manager,
-            object::id(strategy),
+            strategy,
             base_lower_index_i32,
             base_upper_index_i32,
             ctx,
@@ -87,7 +71,7 @@ module turbos_assets_manage::router {
 
     entry public fun deposit<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -112,7 +96,7 @@ module turbos_assets_manage::router {
 
         vault::deposit(
             global_config,
-            vault_manager,
+            strategy,
             vault,
             clmm_pool,
             clmm_positions,
@@ -130,7 +114,7 @@ module turbos_assets_manage::router {
 
     entry public fun mint_liquidity<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -155,7 +139,7 @@ module turbos_assets_manage::router {
 
         vault::mint_liquidity(
             global_config,
-            vault_manager,
+            strategy,
             vault,
             clmm_pool,
             clmm_positions,
@@ -173,7 +157,7 @@ module turbos_assets_manage::router {
 
     entry public fun increase_liquidity<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -185,7 +169,7 @@ module turbos_assets_manage::router {
     ) {
         vault::increase_liquidity(
             global_config,
-            vault_manager,
+            strategy,
             vault,
             clmm_pool,
             clmm_positions,
@@ -199,7 +183,7 @@ module turbos_assets_manage::router {
 
     entry public fun withdraw<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -212,7 +196,7 @@ module turbos_assets_manage::router {
         let sender = tx_context::sender(ctx);
         let (coin_a, coin_b) = vault::withdraw(
             global_config,
-            vault_manager,
+            strategy,
             vault,
             clmm_pool,
             clmm_positions,

@@ -45,8 +45,12 @@ module turbos_assets_manage::vault {
         reward_balances: Bag,
     }
 
-    struct VaultManager<phantom CoinTypeA, phantom CoinTypeB> has key, store {
+    struct Strategy<phantom CoinTypeA, phantom CoinTypeB> has key, store {
         id: UID,
+        clmm_pool_id: ID,
+        coin_a_type_name: TypeName,
+	    coin_b_type_name: TypeName,
+        fee_type_name: TypeName,
          // The key is vault's vault id.
         vaults: LinkedTable<ID, VaultInfo>,
         vault_index: u64,
@@ -107,29 +111,37 @@ module turbos_assets_manage::vault {
         transfer::public_transfer(display, tx_context::sender(ctx));
     }
 
-    public(friend) fun create_vault_manager<CoinTypeA, CoinTypeB>(
+    public(friend) fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
+        clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
         ctx: &mut TxContext
-    ): VaultManager<CoinTypeA, CoinTypeB> {
+    ): Strategy<CoinTypeA, CoinTypeB> {
         config::checked_package_version(global_config);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_vault_manager_role(global_config, operator_address);
 
+        let clmm_pool_id = object::id(clmm_pool);
+        let coin_a_type_name = type_name::get<CoinTypeA>();
+        let coin_b_type_name = type_name::get<CoinTypeB>();
+        let fee_type_name = type_name::get<FeeType>();
         let vaults = linked_table::new<ID, VaultInfo>(ctx);
-        let vault_manager = VaultManager {
+        let strategy = Strategy {
             id: object::new(ctx),
+            clmm_pool_id,
+            coin_a_type_name,
+            coin_b_type_name,
+            fee_type_name,
             vaults,
             vault_index: 0,
             accounts: table::new(ctx),
         };
-        vault_manager
+        strategy
     }
 
     public fun open_vault<CoinTypeA, CoinTypeB>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
-        strategy_id: ID, 
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         base_lower_index: I32,
         base_upper_index: I32,
         ctx: &mut TxContext
@@ -138,7 +150,8 @@ module turbos_assets_manage::vault {
         let vault_id = object::new(ctx);
         let coin_a_type_name = type_name::get<CoinTypeA>();
         let coin_b_type_name = type_name::get<CoinTypeB>();
-        let new_vault_index = vault_manager.vault_index + 1;
+        let new_vault_index = strategy.vault_index + 1;
+        let strategy_id = object::id(strategy);
 
         let vault = Vault {
             id: vault_id,
@@ -151,7 +164,7 @@ module turbos_assets_manage::vault {
             url: string::utf8(b"https://app.turbos.finance/icon/Turbos-30.svg"),
         };
 
-        init_account_balance(vault_manager, object::id(&vault), ctx);
+        init_account_balance(strategy, object::id(&vault), ctx);
 
         let vault_info = VaultInfo {
             vault_id: object::id(&vault),
@@ -163,14 +176,14 @@ module turbos_assets_manage::vault {
             limit_lower_index: i32::zero(),
             limit_upper_index: i32::zero(),
         };
-        vault_manager.vault_index = new_vault_index;
+        strategy.vault_index = new_vault_index;
 
         vault
     }
 
     public fun deposit<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -189,16 +202,16 @@ module turbos_assets_manage::vault {
         let vault_id = object::id(vault);
         assert!(coin::value(&coin_a) > 0 || coin::value(&coin_b) > 0, EInvalidAmount);
         increase_vault_balance(
-            vault_manager, 
+            strategy, 
             vault,
             coin::into_balance(coin_a),
             coin::into_balance(coin_b),
         );
-        let (balance_a, balance_b) = withdraw_vault_balance(vault_manager, vault_id);
-            if (is_clmm_base_nft_exists(vault_manager, vault_id)) {
+        let (balance_a, balance_b) = withdraw_vault_balance(strategy, vault_id);
+            if (is_clmm_base_nft_exists(strategy, vault_id)) {
                 increase_liquidity(
                     global_config,
-                    vault_manager,
+                    strategy,
                     vault,
                     clmm_pool,
                     clmm_positions,
@@ -211,7 +224,7 @@ module turbos_assets_manage::vault {
             } else {
                 mint_liquidity(
                     global_config,
-                    vault_manager,
+                    strategy,
                     vault,
                     clmm_pool,
                     clmm_positions,
@@ -230,7 +243,7 @@ module turbos_assets_manage::vault {
 
     public fun mint_liquidity<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -259,7 +272,7 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
-        fill_clmm_base_nft(vault_manager, vault_id, nft);
+        fill_clmm_base_nft(strategy, vault_id, nft);
 
         if (!i32::lt(limit_tick_lower_index, limit_tick_upper_index)) {
             let (nft_limit, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
@@ -273,16 +286,16 @@ module turbos_assets_manage::vault {
                 clmm_versioned,
                 ctx,
             );
-            fill_clmm_base_nft(vault_manager, vault_id, nft_limit);
+            fill_clmm_base_nft(strategy, vault_id, nft_limit);
             increase_vault_balance(
-                vault_manager, 
+                strategy, 
                 vault,
                 coin::into_balance(limit_coin_a_left),
                 coin::into_balance(limit_coin_b_left),
             );
         } else {
             increase_vault_balance(
-                vault_manager, 
+                strategy, 
                 vault,
                 coin::into_balance(coin_a_left),
                 coin::into_balance(coin_b_left),
@@ -292,7 +305,7 @@ module turbos_assets_manage::vault {
 
     public fun increase_liquidity<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -307,7 +320,7 @@ module turbos_assets_manage::vault {
         let vault_id = object::id(vault);
         assert!(coin::value(&coin_a) > 0 || coin::value(&coin_b) > 0, EInvalidAmount);
         // Add liquidity to existing base positions
-        let nft = borrow_mut_clmm_base_nft(vault_manager, vault_id);
+        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
         let (coin_a_left, coin_b_left) = increase_clmm_liquidity(
             nft,
             clmm_pool,
@@ -318,7 +331,7 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
-        let limit_nft = borrow_mut_clmm_limit_nft(vault_manager, vault_id);
+        let limit_nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
         let (limit_coin_a_left, limit_coin_b_left) = increase_clmm_liquidity(
             limit_nft,
             clmm_pool,
@@ -330,7 +343,7 @@ module turbos_assets_manage::vault {
             ctx,
         );
         increase_vault_balance(
-            vault_manager, 
+            strategy, 
             vault,
             coin::into_balance(limit_coin_a_left),
             coin::into_balance(limit_coin_b_left),
@@ -339,7 +352,7 @@ module turbos_assets_manage::vault {
 
     public fun withdraw<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -353,7 +366,7 @@ module turbos_assets_manage::vault {
         assert!(percentage > 0 && percentage <= 100, EInvalidPercentage);
         let vault_id = object::id(vault);
         collect_clmm_fees(
-            vault_manager,
+            strategy,
             vault,
             clmm_pool,
             clmm_positions,
@@ -361,7 +374,7 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
-        let nft = borrow_mut_clmm_base_nft(vault_manager, vault_id);
+        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
         let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
         let (base_coin_a, base_coin_b) = decrease_clmm_liquidity(
             nft,
@@ -373,12 +386,12 @@ module turbos_assets_manage::vault {
             ctx,
         );
         increase_vault_balance(
-            vault_manager, 
+            strategy, 
             vault,
             coin::into_balance(base_coin_a),
             coin::into_balance(base_coin_b),
         );
-        let limit_nft = borrow_mut_clmm_limit_nft(vault_manager, vault_id);
+        let limit_nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
         let (_, _, liquidity_limit) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
         let (limit_coin_a, limit_coin_b) = decrease_clmm_liquidity(
             limit_nft,
@@ -390,28 +403,28 @@ module turbos_assets_manage::vault {
             ctx,
         );
         increase_vault_balance(
-            vault_manager, 
+            strategy, 
             vault,
             coin::into_balance(limit_coin_a),
             coin::into_balance(limit_coin_b),
         );
-        let (amount_a, amount_b) = vault_balance(vault_manager, vault_id);
+        let (amount_a, amount_b) = vault_balance(strategy, vault_id);
         let (balance_a, balance_b) = decrease_vault_balance(
-            vault_manager, 
+            strategy, 
             vault_id,
             amount_a * 100 / percentage,
             amount_b * 100 / percentage,
         );
         if (burn_clmm_nft && percentage == 100) {
             burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
-                vault_manager,
+                strategy,
                 vault_id,
                 clmm_positions,
                 clmm_versioned,
                 ctx
             );
             burn_clmm_limit_nft<CoinTypeA, CoinTypeB, FeeType>(
-                vault_manager,
+                strategy,
                 vault_id,
                 clmm_positions,
                 clmm_versioned,
@@ -425,7 +438,7 @@ module turbos_assets_manage::vault {
     public fun rebalance<CoinTypeA, CoinTypeB, FeeType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -445,7 +458,7 @@ module turbos_assets_manage::vault {
         //withdraw all liquidity and burn clmm nft
         let (coin_a, coin_b) = withdraw(
             global_config,
-            vault_manager,
+            strategy,
             vault,
             clmm_pool,
             clmm_positions,
@@ -458,7 +471,7 @@ module turbos_assets_manage::vault {
 
         mint_liquidity(
             global_config,
-            vault_manager,
+            strategy,
             vault,
             clmm_pool,
             clmm_positions,
@@ -566,7 +579,7 @@ module turbos_assets_manage::vault {
     }
 
     fun collect_clmm_fees<CoinTypeA, CoinTypeB, FeeType>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -575,9 +588,9 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         let vault_id = object::id(vault);
-        if (is_clmm_base_nft_exists(vault_manager, vault_id)) {
+        if (is_clmm_base_nft_exists(strategy, vault_id)) {
             collect_clmm_base_fees(
-                vault_manager,
+                strategy,
                 vault,
                 clmm_pool,
                 clmm_positions,
@@ -586,9 +599,9 @@ module turbos_assets_manage::vault {
                 ctx,
             );
         };
-        if (is_clmm_limit_nft_exists(vault_manager, vault_id)) {
+        if (is_clmm_limit_nft_exists(strategy, vault_id)) {
             collect_clmm_limit_fees(
-                vault_manager,
+                strategy,
                 vault,
                 clmm_pool,
                 clmm_positions,
@@ -600,7 +613,7 @@ module turbos_assets_manage::vault {
     }
 
     fun collect_clmm_base_fees<CoinTypeA, CoinTypeB, FeeType>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -609,7 +622,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         let vault_id = object::id(vault);
-        let nft = borrow_mut_clmm_base_nft(vault_manager, vault_id);
+        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
         let (coin_a, coin_b) = position_manager::collect_with_return_(
             clmm_pool,
             clmm_positions,
@@ -623,7 +636,7 @@ module turbos_assets_manage::vault {
             ctx,
         );
         increase_vault_balance(
-            vault_manager, 
+            strategy, 
             vault,
             coin::into_balance(coin_a),
             coin::into_balance(coin_b),
@@ -633,7 +646,7 @@ module turbos_assets_manage::vault {
 
     public fun collect_clmm_reward_direct<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -648,7 +661,7 @@ module turbos_assets_manage::vault {
         let vault_id = object::id(vault);
         collect_clmm_reward(
             global_config,
-            vault_manager,
+            strategy,
             vault,
             clmm_pool,
             clmm_positions,
@@ -659,7 +672,7 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx, 
         );
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         let reward_type_name = type_name::get<RewardCoin>();
         
         coin::from_balance(bag::remove<TypeName, Balance<RewardCoin>>(&mut account.reward_balances, reward_type_name), ctx)
@@ -667,7 +680,7 @@ module turbos_assets_manage::vault {
 
     public fun collect_clmm_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
         global_config: &GlobalConfig,
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -681,9 +694,9 @@ module turbos_assets_manage::vault {
         config::checked_package_version(global_config);
         let reward_balance = balance::zero();
         let vault_id = object::id(vault);
-        if (is_clmm_base_nft_exists(vault_manager, vault_id)) {
+        if (is_clmm_base_nft_exists(strategy, vault_id)) {
             let base_reward_coin = collect_clmm_base_reward(
-                vault_manager,
+                strategy,
                 vault,
                 clmm_pool,
                 clmm_positions,
@@ -697,9 +710,9 @@ module turbos_assets_manage::vault {
             balance::join(&mut reward_balance, coin::into_balance(base_reward_coin));
         };
 
-        if (is_clmm_limit_nft_exists(vault_manager, vault_id)) {
+        if (is_clmm_limit_nft_exists(strategy, vault_id)) {
             let limit_reward_coin = collect_clmm_limit_reward(
-                vault_manager,
+                strategy,
                 vault,
                 clmm_pool,
                 clmm_positions,
@@ -713,7 +726,7 @@ module turbos_assets_manage::vault {
             balance::join(&mut reward_balance, coin::into_balance(limit_reward_coin));
         };
         
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         let reward_type_name = type_name::get<RewardCoin>();
         if (!bag::contains<TypeName>(&account.reward_balances, reward_type_name)) {
             let zero_balance = balance::zero<RewardCoin>();
@@ -724,7 +737,7 @@ module turbos_assets_manage::vault {
     }
 
     fun collect_clmm_base_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -736,7 +749,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ): Coin<RewardCoin> {
         let vault_id = object::id(vault);
-        let nft = borrow_mut_clmm_base_nft(vault_manager, vault_id);
+        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
         let (reward_coin) = position_manager::collect_reward_with_return_<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
             clmm_pool,
             clmm_positions,
@@ -755,7 +768,7 @@ module turbos_assets_manage::vault {
     }
 
     fun collect_clmm_limit_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -767,7 +780,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ): Coin<RewardCoin> {
         let vault_id = object::id(vault);
-        let nft = borrow_mut_clmm_limit_nft(vault_manager, vault_id);
+        let nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
         let (reward_coin) = position_manager::collect_reward_with_return_<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
             clmm_pool,
             clmm_positions,
@@ -786,7 +799,7 @@ module turbos_assets_manage::vault {
     }
 
     fun collect_clmm_limit_fees<CoinTypeA, CoinTypeB, FeeType>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -795,7 +808,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         let vault_id = object::id(vault);
-        let nft = borrow_mut_clmm_limit_nft(vault_manager, vault_id);
+        let nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
         let (coin_a, coin_b) = position_manager::collect_with_return_(
             clmm_pool,
             clmm_positions,
@@ -809,7 +822,7 @@ module turbos_assets_manage::vault {
             ctx,
         );
         increase_vault_balance(
-            vault_manager, 
+            strategy, 
             vault,
             coin::into_balance(coin_a),
             coin::into_balance(coin_b),
@@ -818,23 +831,23 @@ module turbos_assets_manage::vault {
     }
 
     fun  increase_vault_balance<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
         balance_a: Balance<CoinTypeA>,
         balance_b: Balance<CoinTypeB>,
     ) {
-        let account = borrow_mut_account_balance(vault_manager, object::id(vault));
+        let account = borrow_mut_account_balance(strategy, object::id(vault));
         balance::join(&mut account.coin_a_balance, balance_a);
         balance::join(&mut account.coin_b_balance, balance_b);
     }
 
     fun decrease_vault_balance<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
         quantity_a: u64,
         quantity_b: u64,
     ): ( Balance<CoinTypeA>, Balance<CoinTypeB> ) {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         let balance_a = balance::split(&mut account.coin_a_balance, quantity_a);
         let balance_b = balance::split(&mut account.coin_b_balance, quantity_b);
 
@@ -842,79 +855,79 @@ module turbos_assets_manage::vault {
     }
 
     public fun is_clmm_base_nft_exists<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): bool {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         option::is_some(&account.clmm_base_nft)
     }
 
     public fun is_clmm_limit_nft_exists<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): bool {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         option::is_some(&account.clmm_limit_nft)
     }
 
     fun fill_clmm_base_nft<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
         nft: TurbosPositionNFT,
     ) {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         option::fill(&mut account.clmm_base_nft, nft)
     }
 
     fun extract_clmm_base_nft<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): TurbosPositionNFT {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         option::extract(&mut account.clmm_base_nft)
     }
 
     fun borrow_mut_clmm_base_nft<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): &mut TurbosPositionNFT {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         option::borrow_mut(&mut account.clmm_base_nft)
     }
 
     fun fill_clmm_limit_nft<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
         nft: TurbosPositionNFT,
     ) {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         option::fill(&mut account.clmm_limit_nft, nft)
     }
 
     fun extract_clmm_limit_nft<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): TurbosPositionNFT {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         option::extract(&mut account.clmm_limit_nft)
     }
 
     fun borrow_mut_clmm_limit_nft<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): &mut TurbosPositionNFT {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         option::borrow_mut(&mut account.clmm_limit_nft)
     }
 
     fun  burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
         clmm_positions: &mut Positions,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ) {
-        let nft = extract_clmm_base_nft(vault_manager, vault_id);
+        let nft = extract_clmm_base_nft(strategy, vault_id);
         position_manager::burn<CoinTypeA, CoinTypeB, FeeType>(
             clmm_positions,
             nft,
@@ -924,13 +937,13 @@ module turbos_assets_manage::vault {
     }
 
     fun  burn_clmm_limit_nft<CoinTypeA, CoinTypeB, FeeType>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
         clmm_positions: &mut Positions,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ) {
-        let nft = extract_clmm_limit_nft(vault_manager, vault_id);
+        let nft = extract_clmm_limit_nft(strategy, vault_id);
         position_manager::burn<CoinTypeA, CoinTypeB, FeeType>(
             clmm_positions,
             nft,
@@ -940,10 +953,10 @@ module turbos_assets_manage::vault {
     }
 
     fun withdraw_vault_balance<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): ( Balance<CoinTypeA>, Balance<CoinTypeB> ) {
-        let account = borrow_mut_account_balance(vault_manager, vault_id);
+        let account = borrow_mut_account_balance(strategy, vault_id);
         let balance_a = balance::withdraw_all(&mut account.coin_a_balance);
         let balance_b = balance::withdraw_all(&mut account.coin_b_balance);
 
@@ -951,28 +964,28 @@ module turbos_assets_manage::vault {
     }
 
     public fun vault_balance<CoinTypeA, CoinTypeB>(
-        vault_manager: &VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): (u64, u64) {
-        let amount_a = balance::value(&table::borrow(&vault_manager.accounts, vault_id).coin_a_balance);
-        let amount_b = balance::value(&table::borrow(&vault_manager.accounts, vault_id).coin_b_balance);
+        let amount_a = balance::value(&table::borrow(&strategy.accounts, vault_id).coin_a_balance);
+        let amount_b = balance::value(&table::borrow(&strategy.accounts, vault_id).coin_b_balance);
         (amount_a, amount_b)
     }
 
     fun  borrow_mut_account_balance<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
     ): &mut Account<CoinTypeA, CoinTypeB> {
-        table::borrow_mut(&mut vault_manager.accounts, vault_id)
+        table::borrow_mut(&mut strategy.accounts, vault_id)
     }
 
     fun  init_account_balance<CoinTypeA, CoinTypeB>(
-        vault_manager: &mut VaultManager<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
         ctx: &mut TxContext,
     ) {
         table::add(
-            &mut vault_manager.accounts,
+            &mut strategy.accounts,
             vault_id,
             Account { 
                 coin_a_balance: balance::zero(), 
