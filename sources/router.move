@@ -5,13 +5,16 @@ module turbos_assets_manage::router {
     use sui::object::{Self, UID, ID};
     use sui::tx_context::{Self, TxContext};
     use sui::transfer;
+    use sui::vec_map::{Self, VecMap};
     use turbos_clmm::i32::{Self, I32};
     use sui::coin::{Self, Coin};
     use turbos_assets_manage::config::{Self, AdminCap, GlobalConfig, OperatorCap};
     use turbos_assets_manage::vault::{Self, Vault, Strategy};
     use turbos_clmm::pool::{Self, Pool, Versioned, PoolRewardVault};
     use turbos_clmm::position_manager::{Self, Positions};
+    use turbos_clmm::full_math_u128;
     use sui::clock::{Self, Clock};
+    use turbos_assets_manage::rewarder::{Self, RewarderManager};
 
     entry public fun set_roles(admin_cap: &AdminCap, config: &mut GlobalConfig, account_address: address, role: u128) {
         config::set_roles(admin_cap, config, account_address, role);
@@ -32,14 +35,24 @@ module turbos_assets_manage::router {
     entry fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
         clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
+        effective_tick_lower: u32,
+        effective_tick_lower_is_neg: bool,
+        effective_tick_upper: u32,
+        effective_tick_upper_is_neg: bool,
         ctx: &mut TxContext
     ) {
         let sender = tx_context::sender(ctx);
+        let effective_tick_lower_i32 = i32::from_u32_neg(effective_tick_lower, effective_tick_lower_is_neg);
+        let effective_tick_upper_i32 = i32::from_u32_neg(effective_tick_upper, effective_tick_upper_is_neg);
         let strategy = vault::create_strategy<CoinTypeA, CoinTypeB, FeeType>(
             operator_cap,
             global_config,
+            rewarder_manager,
             clmm_pool,
+            effective_tick_lower_i32,
+            effective_tick_upper_i32,
             ctx,
         );
 
@@ -71,6 +84,7 @@ module turbos_assets_manage::router {
 
     entry public fun deposit<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
         strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -96,6 +110,7 @@ module turbos_assets_manage::router {
 
         vault::deposit(
             global_config,
+            rewarder_manager,
             strategy,
             vault,
             clmm_pool,
@@ -114,6 +129,7 @@ module turbos_assets_manage::router {
 
     entry public fun mint_liquidity<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
         strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -139,6 +155,7 @@ module turbos_assets_manage::router {
 
         vault::mint_liquidity(
             global_config,
+            rewarder_manager,
             strategy,
             vault,
             clmm_pool,
@@ -157,6 +174,7 @@ module turbos_assets_manage::router {
 
     entry public fun increase_liquidity<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
         strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -169,6 +187,7 @@ module turbos_assets_manage::router {
     ) {
         vault::increase_liquidity(
             global_config,
+            rewarder_manager,
             strategy,
             vault,
             clmm_pool,
@@ -183,6 +202,7 @@ module turbos_assets_manage::router {
 
     entry public fun withdraw<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
         strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -196,6 +216,7 @@ module turbos_assets_manage::router {
         let sender = tx_context::sender(ctx);
         let (coin_a, coin_b) = vault::withdraw(
             global_config,
+            rewarder_manager,
             strategy,
             vault,
             clmm_pool,
