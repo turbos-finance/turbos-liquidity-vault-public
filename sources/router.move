@@ -37,6 +37,14 @@ module turbos_assets_manage::router {
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
         clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
+        base_tick_lower_index: u32,
+        base_tick_lower_index_is_neg: bool,
+        base_tick_upper_index: u32,
+        base_tick_upper_index_is_neg: bool,
+        limit_tick_lower_index: u32,
+        limit_tick_lower_index_is_neg: bool,
+        limit_tick_upper_index: u32,
+        limit_tick_upper_index_is_neg: bool,
         effective_tick_lower: u32,
         effective_tick_lower_is_neg: bool,
         effective_tick_upper: u32,
@@ -44,6 +52,10 @@ module turbos_assets_manage::router {
         ctx: &mut TxContext
     ) {
         let sender = tx_context::sender(ctx);
+        let base_tick_lower_index_i32 = i32::from_u32_neg(base_tick_lower_index, base_tick_lower_index_is_neg);
+        let base_tick_upper_index_i32 = i32::from_u32_neg(base_tick_upper_index, base_tick_upper_index_is_neg);
+        let limit_tick_lower_index_i32 = i32::from_u32_neg(limit_tick_lower_index, limit_tick_lower_index_is_neg);
+        let limit_tick_upper_index_i32 = i32::from_u32_neg(limit_tick_upper_index, limit_tick_upper_index_is_neg);
         let effective_tick_lower_i32 = i32::from_u32_neg(effective_tick_lower, effective_tick_lower_is_neg);
         let effective_tick_upper_i32 = i32::from_u32_neg(effective_tick_upper, effective_tick_upper_is_neg);
         let strategy = vault::create_strategy<CoinTypeA, CoinTypeB, FeeType>(
@@ -51,6 +63,10 @@ module turbos_assets_manage::router {
             global_config,
             rewarder_manager,
             clmm_pool,
+            base_tick_lower_index_i32,
+            base_tick_upper_index_i32,
+            limit_tick_lower_index_i32,
+            limit_tick_upper_index_i32,
             effective_tick_lower_i32,
             effective_tick_upper_i32,
             ctx,
@@ -62,20 +78,12 @@ module turbos_assets_manage::router {
     entry public fun open_vault<CoinTypeA, CoinTypeB>(
         global_config: &GlobalConfig,
         strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
-        base_lower_index: u32,
-        base_lower_index_is_neg: bool,
-        base_upper_index: u32,
-        base_upper_index_is_neg: bool,
         recipient: address,
         ctx: &mut TxContext
     ) {
-        let base_lower_index_i32 = i32::from_u32_neg(base_lower_index, base_lower_index_is_neg);
-        let base_upper_index_i32 = i32::from_u32_neg(base_upper_index, base_upper_index_is_neg);
         let vault = vault::open_vault(
             global_config,
             strategy,
-            base_lower_index_i32,
-            base_upper_index_i32,
             ctx,
         );
 
@@ -91,23 +99,10 @@ module turbos_assets_manage::router {
         clmm_positions: &mut Positions,
         coin_a: Coin<CoinTypeA>, 
         coin_b: Coin<CoinTypeB>, 
-        base_tick_lower_index: u32,
-        base_tick_lower_index_is_neg: bool,
-        base_tick_upper_index: u32,
-        base_tick_upper_index_is_neg: bool,
-        limit_tick_lower_index: u32,
-        limit_tick_lower_index_is_neg: bool,
-        limit_tick_upper_index: u32,
-        limit_tick_upper_index_is_neg: bool,
         clock: &Clock,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ) {
-        let base_tick_lower_index_i32 = i32::from_u32_neg(base_tick_lower_index, base_tick_lower_index_is_neg);
-        let base_tick_upper_index_i32 = i32::from_u32_neg(base_tick_upper_index, base_tick_upper_index_is_neg);
-        let limit_tick_lower_index_i32 = i32::from_u32_neg(limit_tick_lower_index, limit_tick_lower_index_is_neg);
-        let limit_tick_upper_index_i32 = i32::from_u32_neg(limit_tick_upper_index, limit_tick_upper_index_is_neg);
-
         vault::deposit(
             global_config,
             rewarder_manager,
@@ -117,10 +112,6 @@ module turbos_assets_manage::router {
             clmm_positions,
             coin_a,
             coin_b,
-            base_tick_lower_index_i32,
-            base_tick_upper_index_i32,
-            limit_tick_lower_index_i32,
-            limit_tick_upper_index_i32,
             clock,
             clmm_versioned,
             ctx
@@ -136,23 +127,10 @@ module turbos_assets_manage::router {
         clmm_positions: &mut Positions,
         coin_a: Coin<CoinTypeA>, 
         coin_b: Coin<CoinTypeB>, 
-        base_tick_lower_index: u32,
-        base_tick_lower_index_is_neg: bool,
-        base_tick_upper_index: u32,
-        base_tick_upper_index_is_neg: bool,
-        limit_tick_lower_index: u32,
-        limit_tick_lower_index_is_neg: bool,
-        limit_tick_upper_index: u32,
-        limit_tick_upper_index_is_neg: bool,
         clock: &Clock,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ) {
-        let base_tick_lower_index_i32 = i32::from_u32_neg(base_tick_lower_index, base_tick_lower_index_is_neg);
-        let base_tick_upper_index_i32 = i32::from_u32_neg(base_tick_upper_index, base_tick_upper_index_is_neg);
-        let limit_tick_lower_index_i32 = i32::from_u32_neg(limit_tick_lower_index, limit_tick_lower_index_is_neg);
-        let limit_tick_upper_index_i32 = i32::from_u32_neg(limit_tick_upper_index, limit_tick_upper_index_is_neg);
-
         vault::mint_liquidity(
             global_config,
             rewarder_manager,
@@ -162,10 +140,6 @@ module turbos_assets_manage::router {
             clmm_positions,
             coin_a,
             coin_b,
-            base_tick_lower_index_i32,
-            base_tick_upper_index_i32,
-            limit_tick_lower_index_i32,
-            limit_tick_upper_index_i32,
             clock,
             clmm_versioned,
             ctx

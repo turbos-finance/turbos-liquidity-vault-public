@@ -58,6 +58,10 @@ module turbos_assets_manage::vault {
     struct Strategy<phantom CoinTypeA, phantom CoinTypeB> has key, store {
         id: UID,
         clmm_pool_id: ID,
+        base_lower_index: I32,
+        base_upper_index: I32,
+        limit_lower_index: I32,
+        limit_upper_index: I32,
         effective_tick_lower: I32,
 	    effective_tick_upper: I32,
         total_share: u128,
@@ -149,6 +153,10 @@ module turbos_assets_manage::vault {
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
         clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
+        base_lower_index: I32,
+        base_upper_index: I32,
+        limit_lower_index: I32,
+        limit_upper_index: I32,
         effective_tick_lower: I32,
         effective_tick_upper: I32,
         ctx: &mut TxContext
@@ -165,6 +173,10 @@ module turbos_assets_manage::vault {
         let strategy = Strategy {
             id: object::new(ctx),
             clmm_pool_id,
+            base_lower_index,
+            base_upper_index,
+            limit_lower_index,
+            limit_upper_index,
             effective_tick_lower,
             effective_tick_upper,
             rewarders: vector::empty<TypeName>(),
@@ -216,8 +228,6 @@ module turbos_assets_manage::vault {
     public fun open_vault<CoinTypeA, CoinTypeB>(
         global_config: &GlobalConfig,
         strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
-        base_lower_index: I32,
-        base_upper_index: I32,
         ctx: &mut TxContext
     ): Vault {
         config::checked_package_version(global_config);
@@ -246,11 +256,11 @@ module turbos_assets_manage::vault {
             strategy_id,
             coin_a_type_name,
             coin_b_type_name,
-            base_lower_index,
-            base_upper_index,
             base_liquidity: 0,
-            limit_lower_index: i32::zero(),
-            limit_upper_index: i32::zero(),
+            base_lower_index: strategy.base_lower_index,
+            base_upper_index: strategy.base_upper_index,
+            limit_lower_index: strategy.limit_lower_index,
+            limit_upper_index: strategy.limit_upper_index,
             limit_liquidity: 0,
             sqrt_price: 0,
             share: 0,
@@ -271,10 +281,6 @@ module turbos_assets_manage::vault {
         clmm_positions: &mut Positions,
         coin_a: Coin<CoinTypeA>, 
         coin_b: Coin<CoinTypeB>, 
-        base_tick_lower_index: I32,
-        base_tick_upper_index: I32,
-        limit_tick_lower_index: I32,
-        limit_tick_upper_index: I32,
         clock: &Clock,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
@@ -314,10 +320,6 @@ module turbos_assets_manage::vault {
                 clmm_positions,
                 coin::from_balance(balance_a, ctx),
         coin::from_balance(balance_b, ctx),
-                base_tick_lower_index,
-                base_tick_upper_index,
-                limit_tick_lower_index,
-                limit_tick_upper_index,
                 clock,
                 clmm_versioned,
                 ctx,
@@ -392,11 +394,7 @@ module turbos_assets_manage::vault {
         update_vault_info(
             strategy,
             vault_id,
-            base_lower_index,
-            base_upper_index,
             base_liquidity,
-            limit_lower_index,
-            limit_upper_index,
             limit_liquidity,
             sqrt_price,
         );
@@ -442,10 +440,6 @@ module turbos_assets_manage::vault {
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
-        base_tick_lower_index: I32,
-        base_tick_upper_index: I32,
-        limit_tick_lower_index: I32,
-        limit_tick_upper_index: I32,
         clock: &Clock,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
@@ -479,10 +473,6 @@ module turbos_assets_manage::vault {
             clmm_positions,
             coin_a,
             coin_b,
-            base_tick_lower_index,
-            base_tick_upper_index,
-            limit_tick_lower_index,
-            limit_tick_upper_index,
             clock,
             clmm_versioned,
             ctx,
@@ -498,10 +488,6 @@ module turbos_assets_manage::vault {
         clmm_positions: &mut Positions,
         coin_a: Coin<CoinTypeA>, 
         coin_b: Coin<CoinTypeB>, 
-        base_tick_lower_index: I32,
-        base_tick_upper_index: I32,
-        limit_tick_lower_index: I32,
-        limit_tick_upper_index: I32,
         clock: &Clock,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
@@ -517,8 +503,8 @@ module turbos_assets_manage::vault {
             clmm_positions,
             coin_a,
             coin_b,
-            base_tick_lower_index,
-            base_tick_upper_index,
+            strategy.base_lower_index,
+            strategy.base_upper_index,
             clock,
             clmm_versioned,
             ctx,
@@ -527,14 +513,14 @@ module turbos_assets_manage::vault {
         fill_clmm_base_nft(strategy, vault_id, nft);
 
         let limit_liquidity = 0;
-        if (!i32::lt(limit_tick_lower_index, limit_tick_upper_index)) {
+        if (coin::value(&coin_a_left) > 0 || coin::value(&coin_b_left) > 0) {
             let (nft_limit, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
                 clmm_pool,
                 clmm_positions,
                 coin_a_left,
                 coin_b_left,
-                limit_tick_lower_index,
-                limit_tick_upper_index,
+                strategy.limit_lower_index,
+                strategy.limit_upper_index,
                 clock,
                 clmm_versioned,
                 ctx,
@@ -559,11 +545,7 @@ module turbos_assets_manage::vault {
         update_vault_info(
             strategy,
             vault_id,
-            base_tick_lower_index,
-            base_tick_upper_index,
             base_liquidity,
-            limit_tick_lower_index,
-            limit_tick_upper_index,
             limit_liquidity,
             sqrt_price,
         );
@@ -630,11 +612,7 @@ module turbos_assets_manage::vault {
         update_vault_info(
             strategy,
             vault_id,
-            base_lower_index,
-            base_upper_index,
             base_liquidity,
-            limit_lower_index,
-            limit_upper_index,
             limit_liquidity,
             sqrt_price,
         );
@@ -651,14 +629,14 @@ module turbos_assets_manage::vault {
     fun update_vault_info<CoinTypeA, CoinTypeB>(
         strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault_id: ID,
-        base_lower_index: I32,
-        base_upper_index: I32,
         base_liquidity: u128,
-        limit_lower_index: I32,
-        limit_upper_index: I32,
         limit_liquidity: u128,
         sqrt_price: u128,
     ) {
+        let base_lower_index = strategy.base_lower_index;
+        let base_upper_index = strategy.base_upper_index;
+        let limit_lower_index = strategy.limit_lower_index;
+        let limit_upper_index = strategy.limit_upper_index;
         let vault_info = borrow_mut_vault_info(strategy, vault_id);
         vault_info.base_lower_index = base_lower_index;
         vault_info.base_upper_index = base_upper_index;
