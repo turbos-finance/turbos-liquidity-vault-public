@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 module turbos_assets_manage::router {
+    use std::string::{Self, String};
     use sui::object::{Self, UID, ID};
     use sui::tx_context::{Self, TxContext};
     use sui::transfer;
@@ -49,6 +50,7 @@ module turbos_assets_manage::router {
         effective_tick_lower_is_neg: bool,
         effective_tick_upper: u32,
         effective_tick_upper_is_neg: bool,
+        image_url: String,
         ctx: &mut TxContext
     ) {
         let sender = tx_context::sender(ctx);
@@ -69,6 +71,7 @@ module turbos_assets_manage::router {
             limit_tick_upper_index_i32,
             effective_tick_lower_i32,
             effective_tick_upper_i32,
+            image_url,
             ctx,
         );
 
@@ -77,11 +80,11 @@ module turbos_assets_manage::router {
 
     entry public fun open_vault<CoinTypeA, CoinTypeB>(
         global_config: &GlobalConfig,
-        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy,
         recipient: address,
         ctx: &mut TxContext
     ) {
-        let vault = vault::open_vault(
+        let vault = vault::open_vault<CoinTypeA, CoinTypeB>(
             global_config,
             strategy,
             ctx,
@@ -93,7 +96,7 @@ module turbos_assets_manage::router {
     entry public fun deposit<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
-        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -121,7 +124,7 @@ module turbos_assets_manage::router {
     entry public fun mint_liquidity<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
-        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -149,7 +152,7 @@ module turbos_assets_manage::router {
     entry public fun increase_liquidity<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
-        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
@@ -177,7 +180,7 @@ module turbos_assets_manage::router {
     entry public fun withdraw<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
-        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
+        strategy: &mut Strategy,
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
