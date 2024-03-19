@@ -181,6 +181,24 @@ module turbos_assets_manage::vault {
         new_rate: u64,
     }
 
+    struct RewarderClaimedEvent has copy, drop {
+        vault_id: ID,
+        strategy_id: ID,
+        clmm_pool_id: ID,
+        clmm_nft_id: ID,
+        amount: u64,
+        reward_type: TypeName,
+    }
+
+    struct FeeClaimedEvent has copy, drop {
+        vault_id: ID,
+        strategy_id: ID,
+        clmm_pool_id: ID,
+        clmm_nft_id: ID,
+	    amount_a: u64,
+	    amount_b: u64,
+    }
+
     fun init(vault: VAULT, ctx: &mut TxContext) {
         let display_keys = vector::empty();
         vector::push_back(&mut display_keys, utf8(b"name"));
@@ -1129,33 +1147,6 @@ module turbos_assets_manage::vault {
         asset_name
     }
 
-    fun collect_clmm_base_fees<CoinTypeA, CoinTypeB, FeeType>(
-        strategy: &mut Strategy,
-        vault: &Vault,
-        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
-        clmm_positions: &mut Positions,
-        clock: &Clock,
-        clmm_versioned: &Versioned,
-        ctx: &mut TxContext
-    ) {
-        let vault_id = object::id(vault);
-        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
-        let (coin_a, coin_b) = position_manager::collect_with_return_(
-            clmm_pool,
-            clmm_positions,
-            nft,
-            MAX_U64,
-            MAX_U64,
-            object::id_address(vault),
-            clock::timestamp_ms(clock) - 60000,
-            clock,
-            clmm_versioned,
-            ctx,
-        );
-        merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
-        merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b));
-    }
-
     public fun collect_clmm_reward_direct_return<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
@@ -1404,6 +1395,15 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
+
+        event::emit(RewarderClaimedEvent {
+            vault_id,
+            strategy_id: object::id(strategy),
+            clmm_pool_id: object::id(clmm_pool),
+            clmm_nft_id: object::id(nft),
+            amount: coin::value(&reward_coin),
+            reward_type: type_name::get<RewardCoin>(),
+        });
     
         reward_coin
     }
@@ -1434,9 +1434,59 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
+
+         event::emit(RewarderClaimedEvent {
+            vault_id,
+            strategy_id: object::id(strategy),
+            clmm_pool_id: object::id(clmm_pool),
+            clmm_nft_id: object::id(nft),
+            amount: coin::value(&reward_coin),
+            reward_type: type_name::get<RewardCoin>(),
+        });
     
         reward_coin
     }
+
+
+    fun collect_clmm_base_fees<CoinTypeA, CoinTypeB, FeeType>(
+        strategy: &mut Strategy,
+        vault: &Vault,
+        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
+        clmm_positions: &mut Positions,
+        clock: &Clock,
+        clmm_versioned: &Versioned,
+        ctx: &mut TxContext
+    ) {
+        let vault_id = object::id(vault);
+        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
+        let (coin_a, coin_b) = position_manager::collect_with_return_(
+            clmm_pool,
+            clmm_positions,
+            nft,
+            MAX_U64,
+            MAX_U64,
+            object::id_address(vault),
+            clock::timestamp_ms(clock) - 60000,
+            clock,
+            clmm_versioned,
+            ctx,
+        );
+
+        let amount_a = coin::value<CoinTypeA>(&coin_a);
+        let amount_b = coin::value<CoinTypeB>(&coin_b);
+        merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
+        merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b));
+
+        event::emit(FeeClaimedEvent {
+            vault_id,
+            strategy_id: object::id(strategy),
+            clmm_pool_id: object::id(clmm_pool),
+            clmm_nft_id: object::id(nft),
+            amount_a,
+            amount_b
+        })
+    }
+
 
     fun collect_clmm_limit_fees<CoinTypeA, CoinTypeB, FeeType>(
         strategy: &mut Strategy,
@@ -1461,8 +1511,19 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
+        let amount_a = coin::value<CoinTypeA>(&coin_a);
+        let amount_b = coin::value<CoinTypeB>(&coin_b);
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b));
+
+        event::emit(FeeClaimedEvent {
+            vault_id,
+            strategy_id: object::id(strategy),
+            clmm_pool_id: object::id(clmm_pool),
+            clmm_nft_id: object::id(nft),
+            amount_a,
+            amount_b
+        })
     }
 
     public fun is_clmm_base_nft_exists(
