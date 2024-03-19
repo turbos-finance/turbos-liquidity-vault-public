@@ -26,6 +26,7 @@ module turbos_assets_manage::vault {
     use turbos_clmm::math_tick;
     use turbos_clmm::math_u128;
     use turbos_clmm::full_math_u128;
+    use turbos_clmm::full_math_u64;
     use sui::clock::{Self, Clock};
     use turbos_assets_manage::config::{Self, GlobalConfig, OperatorCap};
     use turbos_assets_manage::rewarder::{Self, RewarderManager};
@@ -33,6 +34,7 @@ module turbos_assets_manage::vault {
 
     friend turbos_assets_manage::router;
 
+    const FEE_RATE_SCALE: u64 = 1000000;
     const MAX_U64: u64 = 0xffffffffffffffff;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
@@ -76,6 +78,8 @@ module turbos_assets_manage::vault {
         accounts: Table<ID, Account<CoinTypeA, CoinTypeB>>,
         // Map from user address -> vault id.
         // user_vaults: Table<address, u64>,
+        protocol_fee_rate: u64,
+        protocol_fees: Bag,
     }
 
     struct Vault has store, key {
@@ -136,13 +140,8 @@ module turbos_assets_manage::vault {
         vault_id: ID,
         strategy_id: ID,
         clmm_pool_id: ID,
-        base_lower_index: I32,
-        base_upper_index: I32,
-        limit_lower_index: I32,
-        limit_upper_index: I32,
-        sqrt_price: u128,
-	    share: u128,
-	    pool_total_share: u128
+        amount_a: u64,
+	    amount_b: u64,
     }
 
     struct WithdrawEvent has copy, drop {
@@ -151,13 +150,10 @@ module turbos_assets_manage::vault {
         clmm_pool_id: ID,
         percentage: u64,
         burn_clmm_nft: bool,
-        base_lower_index: I32,
-        base_upper_index: I32,
-        limit_lower_index: I32,
-        limit_upper_index: I32,
-        sqrt_price: u128,
-        share: u128,
-	    pool_total_share: u128
+        amount_a: u64,
+	    amount_b: u64,
+	    protocol_fee_a_amount: u64,
+	    protocol_fee_b_amount: u64
     }
 
     struct RebalanceEvent has copy, drop {
@@ -176,6 +172,11 @@ module turbos_assets_manage::vault {
         clmm_pool_id: ID,
         rewarder_type: TypeName,
         allocate_point: u64
+    }
+
+    struct UpdateFeeRateEvent has copy, drop {
+        old_rate: u64,
+        new_rate: u64,
     }
 
     fun init(vault: VAULT, ctx: &mut TxContext) {
@@ -246,6 +247,8 @@ module turbos_assets_manage::vault {
             vaults,
             vault_index: 0,
             accounts: table::new(ctx),
+            protocol_fee_rate: 0,
+            protocol_fees: bag::new(ctx),
         };
 
         let strategy_id = object::id(&strategy);
@@ -371,7 +374,8 @@ module turbos_assets_manage::vault {
         config::checked_package_version(global_config);
         let sender = tx_context::sender(ctx);
         let vault_id = object::id(vault);
-        assert!(coin::value(&coin_a) > 0 || coin::value(&coin_b) > 0, EInvalidAmount);
+        let (amount_a, amount_b) = (coin::value(&coin_a), coin::value(&coin_b));
+        assert!(amount_a > 0 || amount_b > 0, EInvalidAmount);
         increase_vault_balance(
             strategy, 
             vault,
@@ -414,13 +418,8 @@ module turbos_assets_manage::vault {
             vault_id,
             strategy_id: object::id(strategy),
             clmm_pool_id: object::id(clmm_pool),
-            base_lower_index: strategy.base_lower_index,
-            base_upper_index: strategy.base_upper_index,
-            limit_lower_index: strategy.limit_lower_index,
-            limit_upper_index: strategy.limit_upper_index,
-            sqrt_price: vault_info.sqrt_price,
-            share: vault_info.share,
-            pool_total_share: strategy.total_share,
+            amount_a,
+            amount_b,
         });
     }
 
@@ -502,6 +501,22 @@ module turbos_assets_manage::vault {
             amount_a * 100 / percentage,
             amount_b * 100 / percentage,
         );
+        //protocol fee
+        let protocol_fee_rate = strategy.protocol_fee_rate;
+        let (protocol_fee_a, protocol_fee_b) = if (protocol_fee_rate == 0) {
+            (0, 0)
+        } else {
+            let fee_a_amount = full_math_u64::mul_div_ceil(balance::value(&balance_a), protocol_fee_rate, FEE_RATE_SCALE);
+            let fee_b_amount = full_math_u64::mul_div_ceil(balance::value(&balance_b), protocol_fee_rate, FEE_RATE_SCALE);
+
+            let protocol_asset_a = balance::split(&mut balance_a, fee_a_amount);
+            let protocol_asset_b = balance::split(&mut balance_b, fee_b_amount);
+
+            merge_protocol_asset(strategy, protocol_asset_a);
+            merge_protocol_asset(strategy, protocol_asset_b);
+
+            (fee_a_amount, fee_b_amount)
+        };
         update_vault_reward_info(
             rewarder_manager,
             strategy,
@@ -533,13 +548,10 @@ module turbos_assets_manage::vault {
             clmm_pool_id: object::id(clmm_pool),
             percentage,
             burn_clmm_nft,
-            base_lower_index: strategy.base_lower_index,
-            base_upper_index: strategy.base_upper_index,
-            limit_lower_index: strategy.limit_lower_index,
-            limit_upper_index: strategy.limit_upper_index,
-            sqrt_price: vault_info.sqrt_price,
-            share: vault_info.share,
-            pool_total_share: strategy.total_share,
+            amount_a: balance::value(&balance_a),
+            amount_b: balance::value(&balance_b),
+            protocol_fee_a_amount: protocol_fee_a,
+            protocol_fee_b_amount: protocol_fee_b,
         });
 
         (coin::from_balance(balance_a, ctx), coin::from_balance(balance_b, ctx))
@@ -1047,6 +1059,22 @@ module turbos_assets_manage::vault {
         vault_info.share = new_share;
     }
 
+    fun merge_protocol_asset<CoinTypeA, CoinTypeB, AssetCoinType>(
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
+        balance: Balance<AssetCoinType>,
+    ) {
+        let balance_value = balance::value<AssetCoinType>(&balance);
+        let type_name_string = type_name::get<AssetCoinType>();
+        let asset_name = string::from_ascii(type_name::into_string(type_name_string));
+
+        if (bag::contains<String>(&strategy.protocol_fees, asset_name)) {
+            let protocol_fees_ref = bag::borrow_mut<String, Balance<AssetCoinType>>(&mut strategy.protocol_fees, asset_name);
+            balance::join<AssetCoinType>(protocol_fees_ref, balance);
+        } else {
+            bag::add<String, Balance<AssetCoinType>>(&mut strategy.protocol_fees, asset_name, balance);
+        }
+    }
+
     fun collect_clmm_base_fees<CoinTypeA, CoinTypeB, FeeType>(
         strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
         vault: &Vault,
@@ -1542,6 +1570,16 @@ module turbos_assets_manage::vault {
         let balance_b = balance::withdraw_all(&mut account.coin_b_balance);
 
         (balance_a, balance_b)
+    }
+
+    public fun set_is_clmm_reward_compound<CoinTypeA, CoinTypeB>(
+        strategy: &mut Strategy<CoinTypeA, CoinTypeB>,
+        vault_id: ID,
+        is_compound: bool,
+    ): bool {
+        let vault_info = borrow_mut_vault_info(strategy, vault_id);
+        vault_info.is_clmm_reward_compound = is_compound;
+        vault_info.is_clmm_reward_compound
     }
 
     public fun is_clmm_reward_compound<CoinTypeA, CoinTypeB>(
