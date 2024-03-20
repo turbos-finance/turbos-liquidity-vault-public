@@ -43,6 +43,7 @@ module turbos_assets_manage::vault {
     const ERewardAlreadyExists: u64 = 3;
     const EInvalidTickRange: u64 = 4;
     const ETooLargeProtocolFee: u64 = 5;
+    const ENotRewardCoinType: u64 = 6;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -53,7 +54,6 @@ module turbos_assets_manage::vault {
         clmm_limit_nft: Option<TurbosPositionNFT>,
         // After rebalancing, the rewards that users have in clmm will be collected to this bag
         // and then the old NFT will be destroyed.
-        reward_balances: Bag,
         balances: Bag,
     }
 
@@ -114,7 +114,6 @@ module turbos_assets_manage::vault {
         sqrt_price: u128,
         share: u128,
         rewards: VecMap<TypeName, VaultRewardInfo>,
-        is_clmm_reward_compound: bool,
     }
 
     struct CreateStrategyEvent has copy, drop {
@@ -366,7 +365,6 @@ module turbos_assets_manage::vault {
             sqrt_price: 0,
             share: 0,
             rewards: vec_map::empty<TypeName, VaultRewardInfo>(),
-            is_clmm_reward_compound: false,
         };
         linked_table::push_back<ID, VaultInfo>(&mut strategy.vaults, vault_id, vault_info);
         strategy.vault_index = new_vault_index;
@@ -1147,21 +1145,24 @@ module turbos_assets_manage::vault {
         asset_name
     }
 
-    public fun collect_clmm_reward_direct_return<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
+    public fun collect_clmm_reward_direct_return<CoinTypeA, CoinTypeB, FeeType, RewardCoinType>(
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
         vault: &Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
-        clmm_reward_vault: &mut PoolRewardVault<RewardCoin>,
+        clmm_reward_vault: &mut PoolRewardVault<RewardCoinType>,
         clmm_reward_index: u64,
         recipient: address,
         clock: &Clock,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
-    ): Coin<RewardCoin> {
+    ): Coin<RewardCoinType> {
         config::checked_package_version(global_config);
         let vault_id = object::id(vault);
+        let reward_type = type_name::get<RewardCoinType>();
+        assert!(reward_type!=vault.coin_a_type_name && reward_type!=vault.coin_b_type_name, ENotRewardCoinType);
+
         let reward_balance = collect_clmm_reward(
             strategy,
             object::id(vault),
@@ -1175,23 +1176,23 @@ module turbos_assets_manage::vault {
             ctx, 
         );
         let account = borrow_mut_account_balance(strategy, vault_id);
-        let reward_type_name = type_name::get<RewardCoin>();
-        
-        if (bag::contains<TypeName>(&account.reward_balances, reward_type_name)) {
-            balance::join<RewardCoin>(&mut reward_balance, bag::remove<TypeName, Balance<RewardCoin>>(&mut account.reward_balances, reward_type_name));
+
+        let reward_type_name = get_type_name_str<RewardCoinType>();
+        if (bag::contains<String>(&account.balances, reward_type_name)) {
+            balance::join<RewardCoinType>(&mut reward_balance, bag::remove<String, Balance<RewardCoinType>>(&mut account.balances, reward_type_name));
         };
 
         coin::from_balance(reward_balance, ctx)
     }
 
-    public fun collect_clmm_reward_to_coin_a<CoinTypeA, CoinTypeB, FeeType>(
+    public fun collect_clmm_reward_to_vault<CoinTypeA, CoinTypeB, FeeType, RewardCoinType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
         vault_id: ID,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
-        clmm_reward_vault: &mut PoolRewardVault<CoinTypeA>,
+        clmm_reward_vault: &mut PoolRewardVault<RewardCoinType>,
         clmm_reward_index: u64,
         recipient: address,
         clock: &Clock,
@@ -1202,7 +1203,7 @@ module turbos_assets_manage::vault {
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_rebalance_manager_role(global_config, operator_address);
 
-        let reward_balance = collect_clmm_reward<CoinTypeA, CoinTypeB, FeeType, CoinTypeA>(
+        let reward_balance = collect_clmm_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoinType>(
             strategy,
             vault_id,
             clmm_pool,
@@ -1215,111 +1216,9 @@ module turbos_assets_manage::vault {
             ctx,
         );
 
-        if (is_clmm_reward_compound(strategy, vault_id)) {
-            merge_vault_balance(strategy, vault_id, reward_balance);
-        } else {
-            add_reward_to_reward_balances<CoinTypeA, CoinTypeB, CoinTypeA>(
-                strategy,
-                vault_id,
-                reward_balance
-            );
-        }
+        merge_vault_balance(strategy, vault_id, reward_balance);
     }
 
-    public fun collect_clmm_reward_to_coin_b<CoinTypeA, CoinTypeB, FeeType>(
-        operator_cap: &OperatorCap,
-        global_config: &GlobalConfig,
-        strategy: &mut Strategy,
-        vault_id: ID,
-        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
-        clmm_positions: &mut Positions,
-        clmm_reward_vault: &mut PoolRewardVault<CoinTypeB>,
-        clmm_reward_index: u64,
-        recipient: address,
-        clock: &Clock,
-        clmm_versioned: &Versioned,
-        ctx: &mut TxContext
-    ) {
-        config::checked_package_version(global_config);
-        let operator_address = object::id_address<OperatorCap>(operator_cap);
-        config::check_rebalance_manager_role(global_config, operator_address);
-
-        let reward_balance = collect_clmm_reward<CoinTypeA, CoinTypeB, FeeType, CoinTypeB>(
-            strategy,
-            vault_id,
-            clmm_pool,
-            clmm_positions,
-            clmm_reward_vault,
-            clmm_reward_index,
-            recipient,
-            clock,
-            clmm_versioned,
-            ctx,
-        );
-        
-        if (is_clmm_reward_compound(strategy, vault_id)) {
-            merge_vault_balance(strategy, vault_id, reward_balance);
-        } else {
-            add_reward_to_reward_balances<CoinTypeA, CoinTypeB, CoinTypeB>(
-                strategy,
-                vault_id,
-                reward_balance
-            );
-        }
-    }
-
-    public fun collect_clmm_reward_to_reward_balances<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
-        operator_cap: &OperatorCap,
-        global_config: &GlobalConfig,
-        strategy: &mut Strategy,
-        vault_id: ID,
-        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
-        clmm_positions: &mut Positions,
-        clmm_reward_vault: &mut PoolRewardVault<RewardCoin>,
-        clmm_reward_index: u64,
-        recipient: address,
-        clock: &Clock,
-        clmm_versioned: &Versioned,
-        ctx: &mut TxContext
-    ) {
-        config::checked_package_version(global_config);
-        let operator_address = object::id_address<OperatorCap>(operator_cap);
-        config::check_rebalance_manager_role(global_config, operator_address);
-
-        let reward_balance = collect_clmm_reward(
-            strategy,
-            vault_id,
-            clmm_pool,
-            clmm_positions,
-            clmm_reward_vault,
-            clmm_reward_index,
-            recipient,
-            clock,
-            clmm_versioned,
-            ctx,
-        );
-        
-        add_reward_to_reward_balances<CoinTypeA, CoinTypeB, RewardCoin>(
-            strategy,
-            vault_id,
-            reward_balance
-        );
-    }
-
-    fun add_reward_to_reward_balances<CoinTypeA, CoinTypeB, RewardCoin>(
-        strategy: &mut Strategy,
-        vault_id: ID,
-        reward_balance: Balance<RewardCoin>,
-    ) {
-        let account = borrow_mut_account_balance(strategy, vault_id);
-        let reward_type_name = type_name::get<RewardCoin>();
-        if (!bag::contains<TypeName>(&account.reward_balances, reward_type_name)) {
-            let zero_balance = balance::zero<RewardCoin>();
-            bag::add<TypeName, Balance<RewardCoin>>(&mut account.reward_balances, reward_type_name, zero_balance);
-        };
-
-        balance::join<RewardCoin>(bag::borrow_mut<TypeName, Balance<RewardCoin>>(&mut account.reward_balances, reward_type_name), reward_balance);
-    }
 
     fun collect_clmm_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
         strategy: &mut Strategy,
@@ -1381,7 +1280,10 @@ module turbos_assets_manage::vault {
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ): Coin<RewardCoin> {
+        let strategy_id = object::id(strategy);
+        let clmm_pool_id = object::id(clmm_pool);
         let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
+        let clmm_nft_id = object::id(nft);
         let (reward_coin) = position_manager::collect_reward_with_return_<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
             clmm_pool,
             clmm_positions,
@@ -1398,9 +1300,9 @@ module turbos_assets_manage::vault {
 
         event::emit(RewarderClaimedEvent {
             vault_id,
-            strategy_id: object::id(strategy),
-            clmm_pool_id: object::id(clmm_pool),
-            clmm_nft_id: object::id(nft),
+            strategy_id,
+            clmm_pool_id,
+            clmm_nft_id,
             amount: coin::value(&reward_coin),
             reward_type: type_name::get<RewardCoin>(),
         });
@@ -1420,7 +1322,11 @@ module turbos_assets_manage::vault {
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ): Coin<RewardCoin> {
+        let strategy_id = object::id(strategy);
+        let clmm_pool_id = object::id(clmm_pool);
         let nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
+        let clmm_nft_id = object::id(nft);
+
         let (reward_coin) = position_manager::collect_reward_with_return_<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
             clmm_pool,
             clmm_positions,
@@ -1437,9 +1343,9 @@ module turbos_assets_manage::vault {
 
          event::emit(RewarderClaimedEvent {
             vault_id,
-            strategy_id: object::id(strategy),
-            clmm_pool_id: object::id(clmm_pool),
-            clmm_nft_id: object::id(nft),
+            strategy_id,
+            clmm_pool_id,
+            clmm_nft_id,
             amount: coin::value(&reward_coin),
             reward_type: type_name::get<RewardCoin>(),
         });
@@ -1458,7 +1364,10 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         let vault_id = object::id(vault);
+        let strategy_id = object::id(strategy);
+        let clmm_pool_id = object::id(clmm_pool);
         let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
+        let clmm_nft_id = object::id(nft);
         let (coin_a, coin_b) = position_manager::collect_with_return_(
             clmm_pool,
             clmm_positions,
@@ -1479,9 +1388,9 @@ module turbos_assets_manage::vault {
 
         event::emit(FeeClaimedEvent {
             vault_id,
-            strategy_id: object::id(strategy),
-            clmm_pool_id: object::id(clmm_pool),
-            clmm_nft_id: object::id(nft),
+            strategy_id,
+            clmm_pool_id,
+            clmm_nft_id,
             amount_a,
             amount_b
         })
@@ -1498,7 +1407,11 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         let vault_id = object::id(vault);
+        let strategy_id = object::id(strategy);
+        let clmm_pool_id = object::id(clmm_pool);
         let nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
+        let clmm_nft_id = object::id(nft);
+
         let (coin_a, coin_b) = position_manager::collect_with_return_(
             clmm_pool,
             clmm_positions,
@@ -1518,9 +1431,9 @@ module turbos_assets_manage::vault {
 
         event::emit(FeeClaimedEvent {
             vault_id,
-            strategy_id: object::id(strategy),
-            clmm_pool_id: object::id(clmm_pool),
-            clmm_nft_id: object::id(nft),
+            strategy_id,
+            clmm_pool_id,
+            clmm_nft_id,
             amount_a,
             amount_b
         })
@@ -1640,16 +1553,6 @@ module turbos_assets_manage::vault {
         );
     }
 
-    public fun update_vault_is_clmm_reward_compound(
-        strategy: &mut Strategy,
-        vault_id: ID,
-        is_compound: bool,
-    ): bool {
-        let vault_info = borrow_mut_vault_info(strategy, vault_id);
-        vault_info.is_clmm_reward_compound = is_compound;
-        vault_info.is_clmm_reward_compound
-    }
-
     public fun update_strategy_image_url(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
@@ -1685,14 +1588,6 @@ module turbos_assets_manage::vault {
             new_rate,
         });
         new_rate
-    }
-
-    public fun is_clmm_reward_compound(
-        strategy: &Strategy,
-        vault_id: ID,
-    ): bool {
-        let vault_info = borrow_vault_info(strategy, vault_id);
-        vault_info.is_clmm_reward_compound
     }
 
     fun  borrow_mut_account_balance(
@@ -1742,25 +1637,6 @@ module turbos_assets_manage::vault {
         )
     }
 
-    fun  update_vault_base_liquidity(
-        strategy: &mut Strategy,
-        vault_id: ID,
-        liquidity: u128,
-    ) {
-        let vault_info = linked_table::borrow_mut(&mut strategy.vaults, vault_id);
-        vault_info.base_liquidity = liquidity
-    }
-
-    fun  update_vault_limit_liquidity(
-        strategy: &mut Strategy,
-        vault_id: ID,
-        liquidity: u128,
-    ) {
-        let vault_info = linked_table::borrow_mut(&mut strategy.vaults, vault_id);
-        vault_info.limit_liquidity = liquidity
-    }
-
-
     fun  init_account_balance(
         strategy: &mut Strategy,
         vault_id: ID,
@@ -1772,7 +1648,6 @@ module turbos_assets_manage::vault {
             Account { 
                 clmm_base_nft: option::none<TurbosPositionNFT>(),
                 clmm_limit_nft: option::none<TurbosPositionNFT>(),
-                reward_balances: bag::new(ctx),
                 balances: bag::new(ctx),
             }
         );
