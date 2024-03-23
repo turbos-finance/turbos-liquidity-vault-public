@@ -145,6 +145,6 @@ module turbos_assets_manage::config {
     }
 
     public fun checked_package_version(global_config: &GlobalConfig) {
-        assert!(global_config.package_version < VERSION, EWrongVersion);
+        assert!(global_config.package_version == VERSION, EWrongVersion);
     }
 }
