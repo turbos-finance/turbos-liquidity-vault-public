@@ -97,6 +97,20 @@ module turbos_assets_manage::router {
         transfer::public_transfer(vault, recipient)
     }
 
+    entry public fun close_vault<CoinTypeA, CoinTypeB>(
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault: Vault,
+        ctx: &mut TxContext
+    ) {
+        vault::close_vault<CoinTypeA, CoinTypeB>(
+            global_config,
+            strategy,
+            vault,
+            ctx,
+        )
+    }
+
     entry public fun deposit<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
@@ -134,11 +148,11 @@ module turbos_assets_manage::router {
         clmm_positions: &mut Positions,
         percentage: u64, //0~100
         burn_clmm_nft: bool,
+        recipient: address,
         clock: &Clock,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ) {
-        let sender = tx_context::sender(ctx);
         let (coin_a, coin_b) = vault::withdraw(
             global_config,
             rewarder_manager,
@@ -153,7 +167,56 @@ module turbos_assets_manage::router {
             ctx
         );
 
-        transfer::public_transfer<Coin<CoinTypeA>>(coin_a, sender);
-        transfer::public_transfer<Coin<CoinTypeB>>(coin_b, sender);
+        transfer::public_transfer(coin_a, recipient);
+        transfer::public_transfer(coin_b, recipient);
+    }
+
+    entry public fun collect_clmm_reward_direct_return<CoinTypeA, CoinTypeB, FeeType, RewardCoinType>(
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault: &Vault,
+        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
+        clmm_positions: &mut Positions,
+        clmm_reward_vault: &mut PoolRewardVault<RewardCoinType>,
+        clmm_reward_index: u64,
+        recipient: address,
+        clock: &Clock,
+        clmm_versioned: &Versioned,
+        ctx: &mut TxContext
+    ) {
+        let reward = vault::collect_clmm_reward_direct_return(
+            global_config,
+            strategy,
+            vault,
+            clmm_pool,
+            clmm_positions,
+            clmm_reward_vault,
+            clmm_reward_index,
+            recipient,
+            clock,
+            clmm_versioned,
+            ctx
+        );
+
+        transfer::public_transfer(reward, recipient);
+    }
+
+    entry public fun collect_protocol_fee<BalanceType>(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        amount: u64,
+        recipient: address,
+        ctx: &mut TxContext
+    ) {
+        let coin = vault::collect_protocol_fee<BalanceType>(
+            operator_cap,
+            global_config,
+            strategy,
+            amount,
+            ctx,
+        );
+
+        transfer::public_transfer(coin, recipient);
     }
 }

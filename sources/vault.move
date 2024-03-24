@@ -36,6 +36,7 @@ module turbos_assets_manage::vault {
 
     const FEE_RATE_SCALE: u64 = 1000000;
     const MAX_U64: u64 = 0xffffffffffffffff;
+    const CLMM_DEADLINE_MS: u64 = 60000;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
     const EInvalidAmount: u64 = 1;
@@ -48,6 +49,8 @@ module turbos_assets_manage::vault {
     const ELimitNftExists: u64 = 8;
     const ECoinABalanceGtZero: u64 = 9;
     const ECoinBBalanceGtZero: u64 = 10;
+    const ENotValidProtocolAsset: u64 = 11;
+    const ENotEnoughProtocolAsset: u64 = 12;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -215,7 +218,7 @@ module turbos_assets_manage::vault {
         vector::push_back(&mut display_values, utf8(b"{coin_type_a}"));
         vector::push_back(&mut display_values, utf8(b"{coin_type_b}"));
         vector::push_back(&mut display_values, utf8(b"{description}"));
-        vector::push_back(&mut display_values, utf8(b"{img_url}"));
+        vector::push_back(&mut display_values, utf8(b"{image_url}"));
         vector::push_back(&mut display_values, utf8(b"https://turbos.finance"));
         vector::push_back(&mut display_values, utf8(b"Turbos Team"));
 
@@ -471,33 +474,41 @@ module turbos_assets_manage::vault {
         );
         let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
         let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
-        let (base_coin_a, base_coin_b) = decrease_clmm_liquidity(
-            nft,
-            clmm_pool,
-            clmm_positions,
-            liquidity * 100 / (percentage as u128),
-            clock,
-            clmm_versioned,
-            ctx,
-        );
-        let (base_lower_index, base_upper_index, base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
-        merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a));
-        merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b));
+        let base_liquidity = 0;
+        let coin_a_out = coin::zero<CoinTypeA>(ctx);
+        let coin_b_out = coin::zero<CoinTypeB>(ctx);
+        if (liquidity > 0) {
+            let (base_coin_a, base_coin_b) = decrease_clmm_liquidity(
+                nft,
+                clmm_pool,
+                clmm_positions,
+                full_math_u128::mul_div_floor(liquidity, (percentage as u128), 100),
+                clock,
+                clmm_versioned,
+                ctx,
+            );
+            let (base_lower_index, base_upper_index, base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
+            coin::join(&mut coin_a_out, base_coin_a);
+            coin::join(&mut coin_b_out, base_coin_b);
+        };
 
         let limit_nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
         let (_, _, liquidity_limit) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
-        let (limit_coin_a, limit_coin_b) = decrease_clmm_liquidity(
-            limit_nft,
-            clmm_pool,
-            clmm_positions,
-            liquidity_limit * 100 / (percentage as u128),
-            clock,
-            clmm_versioned,
-            ctx,
-        );
-        let (limit_lower_index, limit_upper_index, limit_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
-        merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_a));
-        merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b));
+        let limit_liquidity = 0;
+        if (liquidity_limit > 0) {
+            let (limit_coin_a, limit_coin_b) = decrease_clmm_liquidity(
+                limit_nft,
+                clmm_pool,
+                clmm_positions,
+                full_math_u128::mul_div_floor(liquidity_limit, (percentage as u128), 100),
+                clock,
+                clmm_versioned,
+                ctx,
+            );
+            let (limit_lower_index, limit_upper_index, limit_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
+            coin::join(&mut coin_a_out, limit_coin_a);
+            coin::join(&mut coin_b_out, limit_coin_b);
+        };
 
         update_vault_info(
             strategy,
@@ -508,23 +519,24 @@ module turbos_assets_manage::vault {
         );
         let amount_a =  vault_balance_amount<CoinTypeA>(strategy, vault_id);
         let amount_b =  vault_balance_amount<CoinTypeB>(strategy, vault_id);
-
-        let balance_a = take_vault_balance_by_amount<CoinTypeA>(strategy, vault_id, amount_a * 100 / percentage);
-        let balance_b = take_vault_balance_by_amount<CoinTypeB>(strategy, vault_id, amount_b * 100 / percentage);
+        let balance_a = take_vault_balance_by_amount<CoinTypeA>(strategy, vault_id, full_math_u64::mul_div_floor(amount_a, percentage, 100));
+        let balance_b = take_vault_balance_by_amount<CoinTypeB>(strategy, vault_id, full_math_u64::mul_div_floor(amount_b, percentage, 100));
+        coin::join(&mut coin_a_out, coin::from_balance(balance_a, ctx));
+        coin::join(&mut coin_b_out, coin::from_balance(balance_b, ctx));
         
         //protocol fee
         let protocol_fee_rate = strategy.protocol_fee_rate;
         let (protocol_fee_a, protocol_fee_b) = if (protocol_fee_rate == 0) {
             (0, 0)
         } else {
-            let fee_a_amount = full_math_u64::mul_div_ceil(balance::value(&balance_a), protocol_fee_rate, FEE_RATE_SCALE);
-            let fee_b_amount = full_math_u64::mul_div_ceil(balance::value(&balance_b), protocol_fee_rate, FEE_RATE_SCALE);
+            let fee_a_amount = full_math_u64::mul_div_ceil(coin::value(&coin_a_out), protocol_fee_rate, FEE_RATE_SCALE);
+            let fee_b_amount = full_math_u64::mul_div_ceil(coin::value(&coin_b_out), protocol_fee_rate, FEE_RATE_SCALE);
 
-            let protocol_asset_a = balance::split(&mut balance_a, fee_a_amount);
-            let protocol_asset_b = balance::split(&mut balance_b, fee_b_amount);
+            let protocol_asset_a = coin::split(&mut coin_a_out, fee_a_amount, ctx);
+            let protocol_asset_b = coin::split(&mut coin_b_out, fee_b_amount, ctx);
 
-            merge_protocol_asset(strategy, protocol_asset_a);
-            merge_protocol_asset(strategy, protocol_asset_b);
+            merge_protocol_asset(strategy, coin::into_balance(protocol_asset_a));
+            merge_protocol_asset(strategy, coin::into_balance(protocol_asset_b));
 
             (fee_a_amount, fee_b_amount)
         };
@@ -559,26 +571,27 @@ module turbos_assets_manage::vault {
             clmm_pool_id: object::id(clmm_pool),
             percentage,
             burn_clmm_nft,
-            amount_a: balance::value(&balance_a),
-            amount_b: balance::value(&balance_b),
+            amount_a: coin::value(&coin_a_out),
+            amount_b: coin::value(&coin_b_out),
             protocol_fee_a_amount: protocol_fee_a,
             protocol_fee_b_amount: protocol_fee_b,
         });
 
-        (coin::from_balance(balance_a, ctx), coin::from_balance(balance_b, ctx))
+        (coin_a_out, coin_b_out)
     }
 
     public fun close_vault<CoinTypeA, CoinTypeB>(
         global_config: &GlobalConfig,
-        rewarder_manager: &mut RewarderManager,
         strategy: &mut Strategy,
         vault: Vault,
         ctx: &mut TxContext
     ) {
+        config::checked_package_version(global_config);
+
         let vault_id = object::id(&vault);
         let account = borrow_vault_account(strategy, vault_id);
         assert!(!is_clmm_base_nft_exists(strategy, vault_id), EBaseNftExists);
-        assert!(!is_clmm_limit_nft_exists(strategy, vault_id), EBaseNftExists);
+        assert!(!is_clmm_limit_nft_exists(strategy, vault_id), ELimitNftExists);
         assert!(get_vault_balance<CoinTypeA>(strategy, vault_id) == 0, ECoinABalanceGtZero);
         assert!(get_vault_balance<CoinTypeB>(strategy, vault_id) == 0, ECoinBBalanceGtZero);
         remove_vault_info(strategy, vault_id);
@@ -811,6 +824,20 @@ module turbos_assets_manage::vault {
         );
     }
 
+    public(friend) fun collect_protocol_fee<BalanceType>(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        amount: u64,
+        ctx: &mut TxContext
+    ): Coin<BalanceType> {
+        config::checked_package_version(global_config);
+        let operator_address = object::id_address<OperatorCap>(operator_cap);
+        config::check_vault_manager_role(global_config, operator_address);
+
+        coin::from_balance(take_protocol_asset_by_amount<BalanceType>(strategy, amount), ctx)
+    }
+
     fun update_vault_info(
         strategy: &mut Strategy,
         vault_id: ID,
@@ -871,7 +898,7 @@ module turbos_assets_manage::vault {
             amount_b_desired,
             0,
             0,
-            clock::timestamp_ms(clock) - 60000,
+            clock::timestamp_ms(clock) + CLMM_DEADLINE_MS,
             clock,
             versioned,
             ctx,
@@ -902,7 +929,7 @@ module turbos_assets_manage::vault {
             amount_b_desired,
             0,
             0,
-            clock::timestamp_ms(clock) - 60000,
+            clock::timestamp_ms(clock) + CLMM_DEADLINE_MS,
             clock,
             versioned,
             ctx,
@@ -927,7 +954,7 @@ module turbos_assets_manage::vault {
             liquidity,
             0,
             0,
-            clock::timestamp_ms(clock) - 60000,
+            clock::timestamp_ms(clock) + CLMM_DEADLINE_MS,
             clock,
             versioned,
             ctx,
@@ -1174,7 +1201,7 @@ module turbos_assets_manage::vault {
         vault_id: ID,
     ): u64 {
         let type_name = get_type_name_str<BalanceType>();
-
+        
         let account = borrow_vault_account(strategy, vault_id);
         if (bag::contains<String>(&account.balances, type_name)) {
             let balance = bag::borrow<String, Balance<BalanceType>>(&account.balances, type_name);
@@ -1182,6 +1209,19 @@ module turbos_assets_manage::vault {
         } else {
             0
         }
+    }
+
+    fun take_protocol_asset_by_amount<BalanceType>(
+        strategy: &mut Strategy,
+        amount: u64,
+    ): Balance<BalanceType> {
+        let type_name = get_type_name_str<BalanceType>();
+    
+        assert!(bag::contains<String>(&strategy.protocol_fees, type_name), ENotValidProtocolAsset);
+        let protocol_fees_ref = bag::borrow_mut<String, Balance<BalanceType>>(&mut strategy.protocol_fees, type_name);
+        assert!(balance::value(protocol_fees_ref) >= amount, ENotEnoughProtocolAsset);
+
+        balance::split<BalanceType>(protocol_fees_ref, amount)
     }
 
     fun merge_protocol_asset<BalanceType>(
@@ -1353,7 +1393,7 @@ module turbos_assets_manage::vault {
             clmm_reward_index,
             MAX_U64,
             recipient,
-            clock::timestamp_ms(clock) - 60000,
+            clock::timestamp_ms(clock) + CLMM_DEADLINE_MS,
             clock,
             clmm_versioned,
             ctx,
@@ -1398,7 +1438,7 @@ module turbos_assets_manage::vault {
             clmm_reward_index,
             MAX_U64,
             recipient,
-            clock::timestamp_ms(clock) - 60000,
+            clock::timestamp_ms(clock) + CLMM_DEADLINE_MS,
             clock,
             clmm_versioned,
             ctx,
@@ -1440,7 +1480,7 @@ module turbos_assets_manage::vault {
             MAX_U64,
             MAX_U64,
             object::id_address(vault),
-            clock::timestamp_ms(clock) - 60000,
+            clock::timestamp_ms(clock) + CLMM_DEADLINE_MS,
             clock,
             clmm_versioned,
             ctx,
@@ -1486,7 +1526,7 @@ module turbos_assets_manage::vault {
             MAX_U64,
             MAX_U64,
             object::id_address(vault),
-            clock::timestamp_ms(clock) - 60000,
+            clock::timestamp_ms(clock) + CLMM_DEADLINE_MS,
             clock,
             clmm_versioned,
             ctx,
