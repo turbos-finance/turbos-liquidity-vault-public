@@ -47,51 +47,106 @@ module turbos_assets_manage::router {
         effective_tick_upper: u32,
         effective_tick_upper_is_neg: bool,
         image_url: String,
+        default_base_rebalance_threshold: u32,
+        default_limit_rebalance_threshold: u32,
         ctx: &mut TxContext
     ) {
-        let sender = tx_context::sender(ctx);
-        let effective_tick_lower_i32 = i32::from_u32_neg(effective_tick_lower, effective_tick_lower_is_neg);
-        let effective_tick_upper_i32 = i32::from_u32_neg(effective_tick_upper, effective_tick_upper_is_neg);
         let strategy = vault::create_strategy<CoinTypeA, CoinTypeB, FeeType>(
             operator_cap,
             global_config,
             rewarder_manager,
             clmm_pool,
-            effective_tick_lower_i32,
-            effective_tick_upper_i32,
+            effective_tick_lower,
+            effective_tick_lower_is_neg,
+            effective_tick_upper,
+            effective_tick_upper_is_neg,
             image_url,
+            default_base_rebalance_threshold,
+            default_limit_rebalance_threshold,
             ctx,
         );
 
-        transfer::public_transfer(strategy, sender)
+        transfer::public_share_object(strategy);
     }
 
     entry public fun open_vault<CoinTypeA, CoinTypeB>(
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
-        base_tick_lower_index: u32,
+        base_tick_lower_index_u32: u32,
         base_tick_lower_index_is_neg: bool,
-        base_tick_upper_index: u32,
+        base_tick_upper_index_u32: u32,
         base_tick_upper_index_is_neg: bool,
-        limit_tick_lower_index: u32,
+        limit_tick_lower_index_u32: u32,
         limit_tick_lower_index_is_neg: bool,
-        limit_tick_upper_index: u32,
+        limit_tick_upper_index_u32: u32,
         limit_tick_upper_index_is_neg: bool,
         recipient: address,
         ctx: &mut TxContext
     ) {
-        let base_tick_lower_index_i32 = i32::from_u32_neg(base_tick_lower_index, base_tick_lower_index_is_neg);
-        let base_tick_upper_index_i32 = i32::from_u32_neg(base_tick_upper_index, base_tick_upper_index_is_neg);
-        let limit_tick_lower_index_i32 = i32::from_u32_neg(limit_tick_lower_index, limit_tick_lower_index_is_neg);
-        let limit_tick_upper_index_i32 = i32::from_u32_neg(limit_tick_upper_index, limit_tick_upper_index_is_neg);
         let vault = vault::open_vault<CoinTypeA, CoinTypeB>(
             global_config,
             strategy,
-            base_tick_lower_index_i32,
-            base_tick_upper_index_i32,
-            limit_tick_lower_index_i32,
-            limit_tick_upper_index_i32,
+            base_tick_lower_index_u32,
+            base_tick_lower_index_is_neg,
+            base_tick_upper_index_u32,
+            base_tick_upper_index_is_neg,
+            limit_tick_lower_index_u32,
+            limit_tick_lower_index_is_neg,
+            limit_tick_upper_index_u32,
+            limit_tick_upper_index_is_neg,
             ctx,
+        );
+
+        transfer::public_transfer(vault, recipient)
+    }
+
+    entry public fun open_vault_and_deposit<CoinTypeA, CoinTypeB, FeeType>(
+        global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
+        strategy: &mut Strategy,
+        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
+        clmm_positions: &mut Positions,
+        coin_a: Coin<CoinTypeA>, 
+        coin_b: Coin<CoinTypeB>, 
+        base_tick_lower_index_u32: u32,
+        base_tick_lower_index_is_neg: bool,
+        base_tick_upper_index_u32: u32,
+        base_tick_upper_index_is_neg: bool,
+        limit_tick_lower_index_u32: u32,
+        limit_tick_lower_index_is_neg: bool,
+        limit_tick_upper_index_u32: u32,
+        limit_tick_upper_index_is_neg: bool,
+        recipient: address,
+        clock: &Clock,
+        clmm_versioned: &Versioned,
+        ctx: &mut TxContext
+    ) {
+        let vault = vault::open_vault<CoinTypeA, CoinTypeB>(
+            global_config,
+            strategy,
+            base_tick_lower_index_u32,
+            base_tick_lower_index_is_neg,
+            base_tick_upper_index_u32,
+            base_tick_upper_index_is_neg,
+            limit_tick_lower_index_u32,
+            limit_tick_lower_index_is_neg,
+            limit_tick_upper_index_u32,
+            limit_tick_upper_index_is_neg,
+            ctx,
+        );
+
+        vault::deposit<CoinTypeA, CoinTypeB, FeeType>(
+            global_config,
+            rewarder_manager,
+            strategy,
+            &mut vault,
+            clmm_pool,
+            clmm_positions,
+            coin_a,
+            coin_b,
+            clock,
+            clmm_versioned,
+            ctx
         );
 
         transfer::public_transfer(vault, recipient)
