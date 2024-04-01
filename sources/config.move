@@ -9,6 +9,8 @@ module turbos_assets_manage::config {
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
+    friend turbos_assets_manage::router;
+
     const EWrongVersion: u64 = 0;
     const EWrongVaultManager: u64 =1;
     const EWrongRewardManager: u64 = 2;
@@ -85,7 +87,7 @@ module turbos_assets_manage::config {
         });
     }
 
-    public fun add_operator(admin_cap: &AdminCap, global_config: &mut GlobalConfig, roles: u128, recipient: address, ctx: &mut TxContext) {
+    public(friend) fun add_operator(admin_cap: &AdminCap, global_config: &mut GlobalConfig, roles: u128, recipient: address, ctx: &mut TxContext) {
         let operator_cap = OperatorCap { id: object::new(ctx) };
         let operator_id = object::id(&operator_cap);
         acl::set_roles(&mut global_config.acl, object::id_address(&operator_cap), roles);
@@ -97,32 +99,32 @@ module turbos_assets_manage::config {
         });
     }
 
-    public fun set_roles(admin_cap: &AdminCap, global_config: &mut GlobalConfig, member: address, roles: u128) {
+    public(friend) fun set_roles(admin_cap: &AdminCap, global_config: &mut GlobalConfig, member: address, roles: u128) {
         checked_package_version(global_config);
         acl::set_roles(&mut global_config.acl, member, roles);
         event::emit(SetRolesEvent { member, roles });
     }
 
 
-    public fun add_role(admin_cap: &AdminCap, global_config: &mut GlobalConfig, member: address, role: u8) {
+    public(friend) fun add_role(admin_cap: &AdminCap, global_config: &mut GlobalConfig, member: address, role: u8) {
         checked_package_version(global_config);
         acl::add_role(&mut global_config.acl, member, role);
         event::emit(AddRoleEvent { member, role });
     }
 
-    public fun remove_role(admin_cap: &AdminCap, global_config: &mut GlobalConfig, member: address, role: u8) {
+    public(friend) fun remove_role(admin_cap: &AdminCap, global_config: &mut GlobalConfig, member: address, role: u8) {
         checked_package_version(global_config);
         acl::remove_role(&mut global_config.acl, member, role);
         event::emit(RemoveRoleEvent { member, role });
     }
 
-    public fun remove_member(admin_cap: &AdminCap, global_config: &mut GlobalConfig, member: address) {
+    public(friend) fun remove_member(admin_cap: &AdminCap, global_config: &mut GlobalConfig, member: address) {
         checked_package_version(global_config);
         acl::remove_member(&mut global_config.acl, member);
         event::emit(RemoveMemberEvent { member });
     }
 
-    public fun set_package_version(admin_cap: &AdminCap, global_config: &mut GlobalConfig, new_version: u64) {
+    public(friend) fun set_package_version(admin_cap: &AdminCap, global_config: &mut GlobalConfig, new_version: u64) {
         let old_version = global_config.package_version;
         global_config.package_version = new_version;
         event::emit(SetPackageVersion { new_version, old_version });

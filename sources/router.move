@@ -49,6 +49,8 @@ module turbos_assets_manage::router {
         image_url: String,
         default_base_rebalance_threshold: u32,
         default_limit_rebalance_threshold: u32,
+        base_minimum_threshold: u32,
+        limit_minimum_threshold: u32,
         ctx: &mut TxContext
     ) {
         let strategy = vault::create_strategy<CoinTypeA, CoinTypeB, FeeType>(
@@ -63,15 +65,18 @@ module turbos_assets_manage::router {
             image_url,
             default_base_rebalance_threshold,
             default_limit_rebalance_threshold,
+            base_minimum_threshold,
+            limit_minimum_threshold,
             ctx,
         );
 
         transfer::public_share_object(strategy);
     }
 
-    entry public fun open_vault<CoinTypeA, CoinTypeB>(
+    entry public fun open_vault<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
+        clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
         base_tick_lower_index_u32: u32,
         base_tick_lower_index_is_neg: bool,
         base_tick_upper_index_u32: u32,
@@ -83,9 +88,10 @@ module turbos_assets_manage::router {
         recipient: address,
         ctx: &mut TxContext
     ) {
-        let vault = vault::open_vault<CoinTypeA, CoinTypeB>(
+        let vault = vault::open_vault<CoinTypeA, CoinTypeB, FeeType>(
             global_config,
             strategy,
+            clmm_pool,
             base_tick_lower_index_u32,
             base_tick_lower_index_is_neg,
             base_tick_upper_index_u32,
@@ -121,9 +127,10 @@ module turbos_assets_manage::router {
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ) {
-        let vault = vault::open_vault<CoinTypeA, CoinTypeB>(
+        let vault = vault::open_vault<CoinTypeA, CoinTypeB, FeeType>(
             global_config,
             strategy,
+            clmm_pool,
             base_tick_lower_index_u32,
             base_tick_lower_index_is_neg,
             base_tick_upper_index_u32,
@@ -273,5 +280,107 @@ module turbos_assets_manage::router {
         );
 
         transfer::public_transfer(coin, recipient);
+    }
+
+    entry public fun update_strategy_protocol_fee_rate(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        new_rate: u64,
+    ) {
+        vault::update_strategy_protocol_fee_rate(
+            operator_cap,
+            global_config,
+            strategy,
+            new_rate
+        );
+    }
+
+    entry public fun update_strategy_default_base_rebalance_threshold(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        default_base_rebalance_threshold: u32,
+    ) {
+        vault::update_strategy_default_base_rebalance_threshold(
+            operator_cap,
+            global_config,
+            strategy,
+            default_base_rebalance_threshold
+        );
+    }
+
+    entry public fun update_strategy_default_limit_rebalance_threshold(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        default_limit_rebalance_threshold: u32,
+    ) {
+        vault::update_strategy_default_limit_rebalance_threshold(
+            operator_cap,
+            global_config,
+            strategy,
+            default_limit_rebalance_threshold
+        );
+    }
+
+    entry public fun update_strategy_base_minimum_threshold(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        base_minimum_threshold: u32,
+    ) {
+        vault::update_strategy_base_minimum_threshold(
+            operator_cap,
+            global_config,
+            strategy,
+            base_minimum_threshold
+        );
+    }
+
+    entry public fun update_strategy_limit_minimum_threshold(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        limit_minimum_threshold: u32,
+    ) {
+        vault::update_strategy_limit_minimum_threshold(
+            operator_cap,
+            global_config,
+            strategy,
+            limit_minimum_threshold
+        );
+    }
+
+    entry public fun update_vault_base_rebalance_threshold(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault_id: ID,
+        base_rebalance_threshold: u32,
+    ) {
+        vault::update_vault_base_rebalance_threshold(
+            operator_cap,
+            global_config,
+            strategy,
+            vault_id,
+            base_rebalance_threshold
+        );
+    }
+
+    entry public fun update_vault_limit_rebalance_threshold(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault_id: ID,
+        limit_rebalance_threshold: u32,
+    ) {
+        vault::update_vault_limit_rebalance_threshold(
+            operator_cap,
+            global_config,
+            strategy,
+            vault_id,
+            limit_rebalance_threshold
+        );
     }
 }

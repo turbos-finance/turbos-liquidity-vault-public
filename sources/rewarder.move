@@ -40,14 +40,16 @@ module turbos_assets_manage::rewarder {
 	    last_reward_time: u64,
 	    total_reward_released: u128,
 	    total_reward_harvested: u64,
-	    strategys: LinkedTable<ID, StrategyRewarderInfo>
+	    strategys: LinkedTable<ID, StrategyRewarderInfo>,
     }
     
     struct RewarderManager has store, key {
 	    id: UID,
 	    vault: Bag,
 	    strategy_shares: LinkedTable<ID, u128>,
-	    rewarders: LinkedTable<TypeName, Rewarder>
+	    rewarders: LinkedTable<TypeName, Rewarder>,
+        //vault id black_list
+        black_list: vector<address>,
     }
 
     struct InitRewarderManagerEvent has copy, drop {
@@ -81,6 +83,7 @@ module turbos_assets_manage::rewarder {
             vault: vault,
             strategy_shares: strategy_shares,
             rewarders: rewarders,
+            black_list: vector::empty(),
         };
 
         let id = object::id(&rewarder_manager);
@@ -322,7 +325,56 @@ module turbos_assets_manage::rewarder {
         rewarder.total_allocate_point = rewarder.total_allocate_point + allocate_points;
     }
 
-    public fun is_strategy_in_rewarder(manager: &RewarderManager, type_name: TypeName, strategy_id: ID): bool {
+    public fun add_reward_black_list(
+        operator_cap: &OperatorCap, 
+        config: &GlobalConfig, 
+        manager: &mut RewarderManager,
+        addreses: vector<address>,
+        ctx: &mut TxContext
+    ) {
+        config::checked_package_version(config);
+
+        let operator_address = object::id_address<OperatorCap>(operator_cap);
+        config::check_reward_manager_role(config, operator_address);
+
+        vector::append(&mut manager.black_list, addreses);
+    }
+
+    public fun remove_reward_black_list(
+        operator_cap: &OperatorCap, 
+        config: &GlobalConfig, 
+        manager: &mut RewarderManager, 
+        addreses: vector<address>,
+        ctx: &mut TxContext
+    ) {
+        config::checked_package_version(config);
+
+        let operator_address = object::id_address<OperatorCap>(operator_cap);
+        config::check_reward_manager_role(config, operator_address);
+
+        while(vector::length(&addreses) > 0) {
+            let element = vector::pop_back(&mut addreses);
+            let (exist, index) = vector::index_of(&manager.black_list, &element);
+            if (exist) {
+                vector::remove(&mut manager.black_list, index);
+            }
+        }
+    }
+
+    public(friend) fun is_in_black_list( 
+        manager: &RewarderManager,
+        vault_address: address,
+    ): bool {
+        let (exist, _index) = vector::index_of(&manager.black_list, &vault_address);
+
+        exist
+    }
+
+    fun is_strategy_in_rewarder(
+        manager: &RewarderManager, 
+        type_name: TypeName, 
+        strategy_id: ID
+    ): bool {
         let rewarder = linked_table::borrow<TypeName, Rewarder>(&manager.rewarders, type_name);
         linked_table::contains<ID, StrategyRewarderInfo>(&rewarder.strategys, strategy_id)
     }
