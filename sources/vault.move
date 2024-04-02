@@ -87,11 +87,11 @@ module turbos_assets_manage::vault {
         protocol_fees: Bag,
         image_url: String,
         tick_space: u32,
-        default_base_rebalance_threshold: u32,
-        default_limit_rebalance_threshold: u32,
-        // The minimum range for the base/limit position, 0-100 percentage above and below the current price.
-        base_minimum_threshold: u32,
-        limit_minimum_threshold: u32,
+        default_base_rebalance_percentage: u32,
+        default_limit_rebalance_percentage: u32,
+        // The minimum step for the base/limit position, 1 step = 1 tick_space.
+        base_tick_step_minimum: u32,
+        limit_tick_step_minimum: u32,
     }
 
     struct Vault has store, key {
@@ -127,8 +127,8 @@ module turbos_assets_manage::vault {
         limit_last_tick_index: I32,
         base_rebalance_threshold: u32,
         limit_rebalance_threshold: u32,
-        base_tick_length: u32,
-        limit_tick_length: u32,
+        base_tick_step: u32,
+        limit_tick_step: u32,
         share: u128,
         rewards: VecMap<TypeName, VaultRewardInfo>,
         earn_stats: VecMap<String, u128>,
@@ -263,10 +263,10 @@ module turbos_assets_manage::vault {
         effective_tick_upper_u32: u32,
         effective_tick_upper_is_neg: bool,
         image_url: String,
-        default_base_rebalance_threshold: u32,
-        default_limit_rebalance_threshold: u32,
-        base_minimum_threshold: u32,
-        limit_minimum_threshold: u32,
+        default_base_rebalance_percentage: u32,
+        default_limit_rebalance_percentage: u32,
+        base_tick_step_minimum: u32,
+        limit_tick_step_minimum: u32,
         ctx: &mut TxContext
     ): Strategy {
         config::checked_package_version(global_config);
@@ -298,10 +298,10 @@ module turbos_assets_manage::vault {
             protocol_fees: bag::new(ctx),
             image_url,
             tick_space,
-            default_base_rebalance_threshold,
-            default_limit_rebalance_threshold,
-            base_minimum_threshold,
-            limit_minimum_threshold
+            default_base_rebalance_percentage,
+            default_limit_rebalance_percentage,
+            base_tick_step_minimum,
+            limit_tick_step_minimum
         };
 
         let strategy_id = object::id(&strategy);
@@ -365,9 +365,13 @@ module turbos_assets_manage::vault {
         limit_tick_lower_index_is_neg: bool,
         limit_tick_upper_index_u32: u32,
         limit_tick_upper_index_is_neg: bool,
+        base_tick_step: u32,
+        limit_tick_step: u32,
         ctx: &mut TxContext
     ): Vault {
         config::checked_package_version(global_config);
+        assert!(base_tick_step >= strategy.base_tick_step_minimum && limit_tick_step >= strategy.limit_tick_step_minimum, ETickRangeTooSmall);
+        
         let base_lower_index = i32::from_u32_neg(base_tick_lower_index_u32, base_tick_lower_index_is_neg);
         let base_upper_index = i32::from_u32_neg(base_tick_upper_index_u32, base_tick_upper_index_is_neg);
         let limit_lower_index = i32::from_u32_neg(limit_tick_lower_index_u32, limit_tick_lower_index_is_neg);
@@ -375,17 +379,19 @@ module turbos_assets_manage::vault {
         let current_tick_index = pool::get_pool_current_index(clmm_pool);
 
         check_tick_range(
-            strategy.base_minimum_threshold,
+            strategy.base_tick_step_minimum,
             current_tick_index,
             base_lower_index,
             base_upper_index,
+            strategy.tick_space,
         );
 
         check_tick_range(
-            strategy.limit_minimum_threshold,
+            strategy.limit_tick_step_minimum,
             current_tick_index,
             limit_lower_index,
             limit_upper_index,
+            strategy.tick_space,
         );
 
         let vault_id = object::new(ctx);
@@ -406,8 +412,6 @@ module turbos_assets_manage::vault {
         };
 
         init_account_balance(strategy, object::id(&vault), ctx);
-        let base_tick_length = i32::abs_u32(i32::sub(base_upper_index, base_lower_index)) / 2;
-        let limit_tick_length = i32::abs_u32(i32::sub(limit_upper_index, limit_lower_index)) / 2;
 
         let vault_id = object::id(&vault);
         let vault_info = VaultInfo {
@@ -425,10 +429,10 @@ module turbos_assets_manage::vault {
             base_last_tick_index: i32::zero(),
             limit_last_tick_index: i32::zero(),
             //0~100, When the tick deviates left or right by more than this percentage, trigger rebalance, usually 75% to 80%.
-            base_rebalance_threshold: strategy.default_base_rebalance_threshold,
-            limit_rebalance_threshold: strategy.default_limit_rebalance_threshold,
-            base_tick_length,
-            limit_tick_length,
+            base_rebalance_threshold: strategy.default_base_rebalance_percentage,
+            limit_rebalance_threshold: strategy.default_limit_rebalance_percentage,
+            base_tick_step,
+            limit_tick_step,
             share: 0,
             rewards: vec_map::empty<TypeName, VaultRewardInfo>(),
             earn_stats: vec_map::empty<String, u128>(),
@@ -565,13 +569,13 @@ module turbos_assets_manage::vault {
         let is_clmm_limit_nft_exists = is_clmm_limit_nft_exists(strategy, vault_id);
         if (is_clmm_limit_nft_exists) {
             let limit_nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
-            let (_, _, liquidity_limit) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
-            if (liquidity_limit > 0) {
+            let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
+            if (liquidity > 0) {
                 let (limit_coin_a, limit_coin_b) = decrease_clmm_liquidity(
                     limit_nft,
                     clmm_pool,
                     clmm_positions,
-                    full_math_u128::mul_div_floor(liquidity_limit, (percentage as u128), 100),
+                    full_math_u128::mul_div_floor(liquidity, (percentage as u128), 100),
                     clock,
                     clmm_versioned,
                     ctx,
@@ -708,9 +712,9 @@ module turbos_assets_manage::vault {
                 clmm_pool,
                 ctx,
             );
-            //if (checkRebalance.base_rebalance || checkRebalance.limit_rebalance) {
-            vector::push_back(&mut rebalance_vaults, checkRebalance);
-            //};
+            if (checkRebalance.base_rebalance || checkRebalance.limit_rebalance) {
+                vector::push_back(&mut rebalance_vaults, checkRebalance);
+            };
             last_vault_id = vault_id;
             vault_id_option = linked_table::next(&strategy.vaults, vault_id);
             index = index + 1;
@@ -733,40 +737,39 @@ module turbos_assets_manage::vault {
         let base_rebalance = false;
         let base_lower_index = vault_info.base_lower_index;
         let base_upper_index = vault_info.base_upper_index;
-        let base_tick_threshold = full_math_u32::mul_div_floor(vault_info.base_tick_length, vault_info.base_rebalance_threshold, 100);
-
-        if (i32::gt(current_tick_index, base_last_tick_index)) {
-            if (i32::abs_u32(i32::sub(current_tick_index, base_last_tick_index)) >= base_tick_threshold) {
-                base_rebalance = true;
-            };
-        } else if (i32::lt(current_tick_index, base_last_tick_index)) {
-            if (i32::abs_u32(i32::sub(base_last_tick_index, current_tick_index)) >= base_tick_threshold) {
-                base_rebalance = true;
-            };
+        let base_tick_step = vault_info.base_tick_step;
+        let limit_tick_step = vault_info.limit_tick_step;
+        let base_tick_length = base_tick_step * strategy.tick_space;
+        let limit_tick_length = limit_tick_step * strategy.tick_space;
+        let max_base_tick_move = full_math_u32::mul_div_floor(base_tick_length, vault_info.base_rebalance_threshold, 100);
+        let base_tick_move =  if (i32::gt(current_tick_index, base_last_tick_index)) {
+            i32::abs_u32(i32::sub(current_tick_index, base_last_tick_index))
+        } else {
+            i32::abs_u32(i32::sub(base_last_tick_index, current_tick_index))
+        };
+        if (base_tick_move >= max_base_tick_move) {
+            base_rebalance = true;
         };
         if (base_rebalance) {
-            base_lower_index = to_tick_index(i32::sub(current_tick_index, i32::from(vault_info.base_tick_length)), strategy.tick_space);
-            base_upper_index = to_tick_index(i32::add(current_tick_index, i32::from(vault_info.base_tick_length)), strategy.tick_space);
+            (base_lower_index, base_upper_index) = calculate_tick_index(current_tick_index, strategy.tick_space, base_tick_step);
         };
 
         let limit_rebalance = false;
         let limit_lower_index = vault_info.limit_lower_index;
         let limit_upper_index = vault_info.limit_upper_index;
-        let limit_last_tick_index = vault_info.limit_last_tick_index;
-        let limit_tick_threshold = full_math_u32::mul_div_floor(vault_info.limit_tick_length, vault_info.limit_rebalance_threshold, 100);
-
         if (is_clmm_limit_nft_exists(strategy, vault_id)) {
             if (base_rebalance) {
                 limit_rebalance = true;
             } else {
-                if (i32::gt(current_tick_index, limit_last_tick_index)) {
-                    if (i32::abs_u32(i32::sub(current_tick_index, limit_last_tick_index)) >= limit_tick_threshold) {
-                        limit_rebalance = true;
-                    };
-                } else if (i32::lt(current_tick_index, limit_last_tick_index)) {
-                    if (i32::abs_u32(i32::sub(limit_last_tick_index, current_tick_index)) >= limit_tick_threshold) {
-                        limit_rebalance = true;
-                    };
+                let limit_last_tick_index = vault_info.limit_last_tick_index;
+                let max_limit_tick_move = full_math_u32::mul_div_floor(limit_tick_length, vault_info.limit_rebalance_threshold, 100);
+                let limit_tick_move =  if (i32::gt(current_tick_index, limit_last_tick_index)) {
+                    i32::abs_u32(i32::sub(current_tick_index, limit_last_tick_index))
+                } else {
+                    i32::abs_u32(i32::sub(limit_last_tick_index, current_tick_index))
+                };
+                if (limit_tick_move >= max_limit_tick_move) {
+                    base_rebalance = true;
                 };
             };
         };
@@ -775,8 +778,7 @@ module turbos_assets_manage::vault {
             //The base rebalance triggered by the limit rebalance does not need to change the tick range.
             //Only increase liquidity collected from limit.
             base_rebalance = true;
-            limit_lower_index = to_tick_index(i32::sub(current_tick_index, i32::from(vault_info.base_tick_length)), strategy.tick_space);
-            limit_upper_index = to_tick_index(i32::add(current_tick_index, i32::from(vault_info.base_tick_length)), strategy.tick_space);
+            (limit_lower_index, limit_upper_index) = calculate_tick_index(current_tick_index, strategy.tick_space, limit_tick_step);
         };
 
         CheckRebalance {
@@ -790,11 +792,42 @@ module turbos_assets_manage::vault {
         }
     }
 
-    fun to_tick_index(
-        index: I32,
+    fun calculate_tick_index(
+        curent_index: I32,
         tick_space: u32,
+        step: u32,
+    ): (I32, I32) {
+        // lower_index = (curent_index - (curent_index % tick_space)) - (step + 1) * tick_space
+        // upper_index = (curent_index - (curent_index % tick_space)) + (step + 1) * tick_space
+        let remainder = i32::sub(curent_index, i32::mod(curent_index, i32::from_u32(tick_space)));
+        let step_i32 = i32::from_u32(step + 1);
+        let lower_index = i32::sub(remainder, i32::mul(i32::from_u32(tick_space), step_i32));
+        let upper_index = i32::add(remainder, i32::mul(i32::from_u32(tick_space), step_i32));
+
+        (lower_index, upper_index)
+    }
+
+    fun floor_tick_index(
+        tick_index: I32,
+        tick_space: u32,
+        is_lower: bool,
     ): I32 {
-        i32::sub(index, i32::mod(index, i32::from_u32(tick_space)))
+        let tick_space_i32 = i32::from(tick_space);
+        if (i32::eq(i32::mod(tick_index, tick_space_i32), i32::zero())) {
+            return tick_index
+        };
+        let remainder = i32::sub(tick_index, i32::mod(tick_index, tick_space_i32));
+        if (i32::gt(tick_index, i32::zero())) {
+            if (!is_lower) {
+                remainder = i32::add(remainder, tick_space_i32)
+            }
+        } else {
+            if (is_lower) {
+                remainder = i32::sub(remainder, tick_space_i32)
+            }
+        };
+
+        remainder
     }
 
     public fun rebalance<CoinTypeA, CoinTypeB, FeeType>(
@@ -832,17 +865,19 @@ module turbos_assets_manage::vault {
         let current_tick_index = pool::get_pool_current_index(clmm_pool);
 
         check_tick_range(
-            strategy.base_minimum_threshold,
+            strategy.base_tick_step_minimum,
             current_tick_index,
             base_lower_index,
             base_upper_index,
+            strategy.tick_space,
         );
 
         check_tick_range(
-            strategy.limit_minimum_threshold,
+            strategy.limit_tick_step_minimum,
             current_tick_index,
             limit_lower_index,
             limit_upper_index,
+            strategy.tick_space,
         );
 
         if (!checkRebalance.base_rebalance && !checkRebalance.limit_rebalance) {
@@ -945,8 +980,13 @@ module turbos_assets_manage::vault {
             };
 
             if (coin::value(&coin_a_left) > 0 || coin::value(&coin_b_left) > 0) {
-                let limit_lower_index = if (coin::value(&coin_a_left) > 0) current_tick_index else checkRebalance.limit_lower_index;
-                let limit_upper_index = if (coin::value(&coin_a_left) > 0) checkRebalance.limit_upper_index else current_tick_index;
+                if (coin::value(&coin_a_left) > 0) {
+                    let limit_lower_index = floor_tick_index(current_tick_index, strategy.tick_space, true);
+                    let limit_upper_index = checkRebalance.limit_upper_index;
+                } else {
+                    let limit_lower_index = checkRebalance.limit_lower_index;
+                    let limit_upper_index = floor_tick_index(current_tick_index, strategy.tick_space, false);
+                };
                 let (nft_limit, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
                     clmm_pool,
                     clmm_positions,
@@ -1024,17 +1064,19 @@ module turbos_assets_manage::vault {
         let current_tick_index = pool::get_pool_current_index(clmm_pool);
 
         check_tick_range(
-            strategy.base_minimum_threshold,
+            strategy.base_tick_step_minimum,
             current_tick_index,
             base_lower_index,
             base_upper_index,
+            strategy.tick_space,
         );
 
         check_tick_range(
-            strategy.limit_minimum_threshold,
+            strategy.limit_tick_step_minimum,
             current_tick_index,
             limit_lower_index,
             limit_upper_index,
+            strategy.tick_space,
         );
 
         let (nft, coin_a_left, coin_b_left) = mint_clmm_liquidity(
@@ -1054,9 +1096,22 @@ module turbos_assets_manage::vault {
 
         let limit_liquidity = 0;
         let limit_last_tick_index = get_vault_limit_last_tick_index(strategy, vault_id);
-        if (coin::value(&coin_a_left) > 0 || coin::value(&coin_b_left) > 0) {
-            limit_lower_index = if (coin::value(&coin_a_left) > 0) current_tick_index else limit_lower_index;
-            limit_upper_index = if (coin::value(&coin_a_left) > 0) limit_upper_index else current_tick_index;
+        let amount_a = (coin::value(&coin_a_left) as u128);
+        let amount_b = (coin::value(&coin_b_left) as u128);
+        let bid_lower_index = limit_lower_index;
+        let bid_upper_index = floor_tick_index(current_tick_index, strategy.tick_space, true);
+        let ask_lower_index = floor_tick_index(current_tick_index, strategy.tick_space, false);
+        let ask_upper_index = limit_upper_index;
+        let bid_liquidity = math_liquidity::get_liquidity_for_amounts(sqrt_price, math_tick::sqrt_price_from_tick_index(bid_lower_index), math_tick::sqrt_price_from_tick_index(bid_upper_index), amount_a, amount_b);
+        let ask_liquidity = math_liquidity::get_liquidity_for_amounts(sqrt_price, math_tick::sqrt_price_from_tick_index(ask_lower_index), math_tick::sqrt_price_from_tick_index(ask_upper_index), amount_a, amount_b);
+        if (bid_liquidity > 0 || ask_liquidity > 0) {
+            if (bid_liquidity > ask_liquidity) {
+                limit_lower_index = bid_lower_index;
+                limit_upper_index = bid_upper_index;
+            } else {
+                limit_lower_index = ask_lower_index;
+                limit_upper_index = ask_upper_index;
+            };
             let (nft_limit, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
                 clmm_pool,
                 clmm_positions,
@@ -1184,19 +1239,27 @@ module turbos_assets_manage::vault {
     }
 
     fun check_tick_range(
-        minimum_threshold: u32,
+        tick_step_minimum: u32,
         current_index: I32,
         lower_index: I32,
         upper_index: I32,
+        tick_space: u32,
     ) {
+        let tick_space_i32 = i32::from_u32(tick_space);
         assert!(i32::lt(lower_index, current_index) && i32::lt(current_index, upper_index), EInvalidTickRange);
-        assert!(i32::lt(
+        let (minimum_lower_index, minimum_upper_index) = calculate_tick_index(
+            current_index,
+            tick_space,
+            tick_step_minimum
+        );
+
+        assert!(i32::lte(
             lower_index,
-            i32::sub(current_index, i32::mul(current_index, i32::from_u32(minimum_threshold))),
+            minimum_lower_index,
         ), ETickRangeTooSmall);
-        assert!(i32::gt(
+        assert!(i32::gte(
             upper_index,
-            i32::add(current_index, i32::mul(current_index, i32::from_u32(minimum_threshold))),
+            minimum_upper_index
         ), ETickRangeTooSmall)
     }
 
@@ -2083,60 +2146,60 @@ module turbos_assets_manage::vault {
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
-        default_base_rebalance_threshold: u32,
+        default_base_rebalance_percentage: u32,
     ): u32 {
         config::checked_package_version(global_config);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_vault_manager_role(global_config, operator_address);
 
-        strategy.default_base_rebalance_threshold = default_base_rebalance_threshold;
+        strategy.default_base_rebalance_percentage = default_base_rebalance_percentage;
 
-        default_base_rebalance_threshold
+        default_base_rebalance_percentage
     }
 
     public(friend) fun update_strategy_default_limit_rebalance_threshold(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
-        default_limit_rebalance_threshold: u32,
+        default_limit_rebalance_percentage: u32,
     ): u32 {
         config::checked_package_version(global_config);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_vault_manager_role(global_config, operator_address);
 
-        strategy.default_limit_rebalance_threshold = default_limit_rebalance_threshold;
+        strategy.default_limit_rebalance_percentage = default_limit_rebalance_percentage;
 
-        default_limit_rebalance_threshold
+        default_limit_rebalance_percentage
     }
 
     public(friend) fun update_strategy_base_minimum_threshold(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
-        base_minimum_threshold: u32,
+        base_tick_step_minimum: u32,
     ): u32 {
         config::checked_package_version(global_config);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_vault_manager_role(global_config, operator_address);
 
-        strategy.base_minimum_threshold = base_minimum_threshold;
+        strategy.base_tick_step_minimum = base_tick_step_minimum;
 
-        base_minimum_threshold
+        base_tick_step_minimum
     }
 
     public(friend) fun update_strategy_limit_minimum_threshold(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
-        limit_minimum_threshold: u32,
+        limit_tick_step_minimum: u32,
     ): u32 {
         config::checked_package_version(global_config);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_vault_manager_role(global_config, operator_address);
 
-        strategy.limit_minimum_threshold = limit_minimum_threshold;
+        strategy.limit_tick_step_minimum = limit_tick_step_minimum;
 
-        limit_minimum_threshold
+        limit_tick_step_minimum
     }
 
     public(friend) fun update_vault_base_rebalance_threshold(
@@ -2333,5 +2396,105 @@ module turbos_assets_manage::vault {
         let self = vector::empty<Coin<T>>();
         vector::push_back(&mut self, coin);
         self
+    }
+
+    #[test]
+    fun test_floor_tick_index() {
+        let (curent_index, tick_space) = (
+            i32::from(10), 
+            10, 
+        );
+        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        assert!(i32::eq(tick_index, i32::from(10)), 1);
+        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        assert!(i32::eq(tick_index, i32::from(10)), 1);
+
+        let (curent_index, tick_space) = (
+            i32::from(11), 
+            10, 
+        );
+        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        assert!(i32::eq(tick_index, i32::from(20)), 1);
+        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        assert!(i32::eq(tick_index, i32::from(10)), 1);
+
+        let (curent_index, tick_space) = (
+            i32::from(9), 
+            10, 
+        );
+        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        assert!(i32::eq(tick_index, i32::from(10)), 1);
+        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        assert!(i32::eq(tick_index, i32::from(0)), 1);
+
+        let (curent_index, tick_space) = (
+            i32::neg_from(10), 
+            10, 
+        );
+        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
+        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
+
+        let (curent_index, tick_space) = (
+            i32::neg_from(11), 
+            10, 
+        );
+        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
+        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        assert!(i32::eq(tick_index, i32::neg_from(20)), 1);
+
+        let (curent_index, tick_space) = (
+            i32::neg_from(9), 
+            10, 
+        );
+        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        assert!(i32::eq(tick_index, i32::from(0)), 1);
+        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
+    }
+
+    #[test]
+    fun test_calculate_tick_index() {
+        let (curent_index, tick_space, step) = (
+            i32::from(10), 
+            10, 
+            0
+        );
+        let (lower_index, upper_index) = calculate_tick_index(
+            curent_index,
+            tick_space,
+            step,
+        );
+        assert!(i32::eq(lower_index, i32::from(0)), 1);
+        assert!(i32::eq(upper_index, i32::from(20)), 1);
+
+        curent_index = i32::neg_from(10);
+        (lower_index, upper_index) = calculate_tick_index(
+            curent_index,
+            tick_space,
+            step,
+        );
+        assert!(i32::eq(lower_index, i32::neg_from(20)), 1);
+        assert!(i32::eq(upper_index, i32::from(0)), 1);
+
+        curent_index = i32::from(9);
+        (lower_index, upper_index) = calculate_tick_index(
+            curent_index,
+            tick_space,
+            step,
+        );
+        assert!(i32::eq(lower_index, i32::neg_from(10)), 1);
+        assert!(i32::eq(upper_index, i32::from(10)), 1);
+
+        curent_index = i32::neg_from(9);
+        (lower_index, upper_index) = calculate_tick_index(
+            curent_index,
+            tick_space,
+            step,
+        );
+        assert!(i32::eq(lower_index, i32::neg_from(10)), 1);
+        assert!(i32::eq(upper_index, i32::from(10)), 1);
     }
 }

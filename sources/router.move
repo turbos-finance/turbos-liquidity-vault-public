@@ -47,10 +47,10 @@ module turbos_assets_manage::router {
         effective_tick_upper: u32,
         effective_tick_upper_is_neg: bool,
         image_url: String,
-        default_base_rebalance_threshold: u32,
-        default_limit_rebalance_threshold: u32,
-        base_minimum_threshold: u32,
-        limit_minimum_threshold: u32,
+        default_base_rebalance_percentage: u32,
+        default_limit_rebalance_percentage: u32,
+        base_tick_step_minimum: u32,
+        limit_tick_step_minimum: u32,
         ctx: &mut TxContext
     ) {
         let strategy = vault::create_strategy<CoinTypeA, CoinTypeB, FeeType>(
@@ -63,10 +63,10 @@ module turbos_assets_manage::router {
             effective_tick_upper,
             effective_tick_upper_is_neg,
             image_url,
-            default_base_rebalance_threshold,
-            default_limit_rebalance_threshold,
-            base_minimum_threshold,
-            limit_minimum_threshold,
+            default_base_rebalance_percentage,
+            default_limit_rebalance_percentage,
+            base_tick_step_minimum,
+            limit_tick_step_minimum,
             ctx,
         );
 
@@ -85,6 +85,8 @@ module turbos_assets_manage::router {
         limit_tick_lower_index_is_neg: bool,
         limit_tick_upper_index_u32: u32,
         limit_tick_upper_index_is_neg: bool,
+        base_tick_step: u32,
+        limit_tick_step: u32,
         recipient: address,
         ctx: &mut TxContext
     ) {
@@ -100,6 +102,8 @@ module turbos_assets_manage::router {
             limit_tick_lower_index_is_neg,
             limit_tick_upper_index_u32,
             limit_tick_upper_index_is_neg,
+            base_tick_step,
+            limit_tick_step,
             ctx,
         );
 
@@ -122,6 +126,8 @@ module turbos_assets_manage::router {
         limit_tick_lower_index_is_neg: bool,
         limit_tick_upper_index_u32: u32,
         limit_tick_upper_index_is_neg: bool,
+        base_tick_step: u32,
+        limit_tick_step: u32,
         recipient: address,
         clock: &Clock,
         clmm_versioned: &Versioned,
@@ -139,6 +145,8 @@ module turbos_assets_manage::router {
             limit_tick_lower_index_is_neg,
             limit_tick_upper_index_u32,
             limit_tick_upper_index_is_neg,
+            base_tick_step,
+            limit_tick_step,
             ctx,
         );
 
