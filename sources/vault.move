@@ -86,10 +86,10 @@ module turbos_assets_manage::vault {
         protocol_fee_rate: u64,
         protocol_fees: Bag,
         image_url: String,
-        tick_space: u32,
+        tick_spacing: u32,
         default_base_rebalance_percentage: u32,
         default_limit_rebalance_percentage: u32,
-        // The minimum step for the base/limit position, 1 step = 1 tick_space.
+        // The minimum step for the base/limit position, 1 step = 1 tick_spacing.
         base_tick_step_minimum: u32,
         limit_tick_step_minimum: u32,
     }
@@ -139,6 +139,7 @@ module turbos_assets_manage::vault {
         base_rebalance: bool,
         base_lower_index: I32,
         base_upper_index: I32,
+        base_just_increase: bool,
         limit_rebalance: bool,
         limit_lower_index: I32,
         limit_upper_index: I32,
@@ -280,7 +281,7 @@ module turbos_assets_manage::vault {
         let coin_b_type_name = type_name::get<CoinTypeB>();
         let fee_type_name = type_name::get<FeeType>();
         let vaults = linked_table::new<ID, VaultInfo>(ctx);
-        let tick_space = pool::get_pool_tick_spacing(clmm_pool);
+        let tick_spacing = pool::get_pool_tick_spacing(clmm_pool);
         let strategy = Strategy {
             id: object::new(ctx),
             clmm_pool_id,
@@ -297,7 +298,7 @@ module turbos_assets_manage::vault {
             protocol_fee_rate: 0,
             protocol_fees: bag::new(ctx),
             image_url,
-            tick_space,
+            tick_spacing,
             default_base_rebalance_percentage,
             default_limit_rebalance_percentage,
             base_tick_step_minimum,
@@ -383,7 +384,7 @@ module turbos_assets_manage::vault {
             current_tick_index,
             base_lower_index,
             base_upper_index,
-            strategy.tick_space,
+            strategy.tick_spacing,
         );
 
         check_tick_range(
@@ -391,7 +392,7 @@ module turbos_assets_manage::vault {
             current_tick_index,
             limit_lower_index,
             limit_upper_index,
-            strategy.tick_space,
+            strategy.tick_spacing,
         );
 
         let vault_id = object::new(ctx);
@@ -470,44 +471,140 @@ module turbos_assets_manage::vault {
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b));
 
+        let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
+        let current_tick_index = pool::get_pool_current_index(clmm_pool);
+
         let balance_a = take_vault_balance<CoinTypeA>(strategy, vault_id);
         let balance_b = take_vault_balance<CoinTypeB>(strategy, vault_id);
+        let coin_a = coin::from_balance(balance_a, ctx);
+        let coin_b = coin::from_balance(balance_b, ctx);
+        let base_coin_a_left = coin::zero<CoinTypeA>(ctx);
+        let base_coin_b_left = coin::zero<CoinTypeB>(ctx);
+        let base_lower_index = get_vault_base_lower_index(strategy, vault_id);
+        let base_upper_index = get_vault_base_upper_index(strategy, vault_id);
+        let base_liquidity;
+        let base_last_tick_index = get_vault_base_last_tick_index(strategy, vault_id);
         if (is_clmm_base_nft_exists(strategy, vault_id)) {
-            increase_liquidity(
-                global_config,
-                rewarder_manager,
-                strategy,
-                vault,
+            let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
+            let (coin_a_left, coin_b_left) = increase_clmm_liquidity(
+                nft,
                 clmm_pool,
                 clmm_positions,
-        coin::from_balance(balance_a, ctx),
-        coin::from_balance(balance_b, ctx),
+                coin_a,
+                coin_b,
                 clock,
                 clmm_versioned,
                 ctx,
             );
+            coin::join(&mut base_coin_a_left, coin_a_left);
+            coin::join(&mut base_coin_b_left, coin_b_left);
+            (base_lower_index, base_upper_index, base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
         } else {
-            let vault_info = borrow_vault_info(strategy, vault_id);
-            mint_liquidity(
-                global_config,
-                rewarder_manager,
-                strategy,
-                vault,
-                vault_info.base_lower_index,
-                vault_info.base_upper_index,
-                vault_info.limit_lower_index,
-                vault_info.limit_upper_index,
+            let (nft, coin_a_left, coin_b_left) = mint_clmm_liquidity(
                 clmm_pool,
                 clmm_positions,
-                coin::from_balance(balance_a, ctx),
-        coin::from_balance(balance_b, ctx),
+                coin_a,
+                coin_b,
+                base_lower_index,
+                base_upper_index,
                 clock,
                 clmm_versioned,
                 ctx,
             );
+            coin::join(&mut base_coin_a_left, coin_a_left);
+            coin::join(&mut base_coin_b_left, coin_b_left);
+            (base_lower_index, base_upper_index, base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&nft));
+            fill_clmm_base_nft(strategy, vault_id, nft);
+            base_last_tick_index = current_tick_index;
         };
 
-        let vault_info = borrow_vault_info(strategy, vault_id);
+        let limit_lower_index = get_vault_limit_lower_index(strategy, vault_id);
+        let limit_upper_index = get_vault_limit_upper_index(strategy, vault_id);
+        let limit_liquidity = 0;
+        let limit_last_tick_index = get_vault_limit_last_tick_index(strategy, vault_id);
+        let limit_coin_a_left = coin::zero<CoinTypeA>(ctx);
+        let limit_coin_b_left = coin::zero<CoinTypeB>(ctx);
+        let amount_a = coin::value(&base_coin_a_left);
+        let amount_b = coin::value(&base_coin_b_left);
+        if (is_clmm_limit_nft_exists(strategy, vault_id)) {
+            let nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
+            let liquidity = calculate_liquidity(sqrt_price, limit_lower_index, limit_upper_index, amount_a, amount_b);
+            if (liquidity>0) {
+                let (coin_a_left, coin_b_left) = increase_clmm_liquidity(
+                    nft,
+                    clmm_pool,
+                    clmm_positions,
+                    base_coin_a_left,
+                    base_coin_b_left,
+                    clock,
+                    clmm_versioned,
+                    ctx,
+                );
+                coin::join(&mut limit_coin_a_left, coin_a_left);
+                coin::join(&mut limit_coin_b_left, coin_b_left);
+                (limit_lower_index, limit_upper_index , limit_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
+            } else {
+                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a_left));
+                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b_left));
+            };    
+        } else {
+            let bid_lower_index = limit_lower_index;
+            let bid_upper_index = floor_tick_index(current_tick_index, strategy.tick_spacing, true);
+            let ask_lower_index = floor_tick_index(current_tick_index, strategy.tick_spacing, false);
+            let ask_upper_index = limit_upper_index;
+            let bid_liquidity = calculate_liquidity(sqrt_price, bid_lower_index, bid_upper_index, amount_a, amount_b);
+            let ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a, amount_b);
+            if (bid_liquidity > 0 || ask_liquidity > 0) {
+                (limit_lower_index, limit_upper_index) = if (bid_liquidity > ask_liquidity) {
+                    (bid_lower_index, bid_upper_index)
+                } else {
+                    (ask_lower_index, ask_upper_index)
+                };
+                let (nft, coin_a_left, coin_b_left) = mint_clmm_liquidity(
+                    clmm_pool,
+                    clmm_positions,
+                    base_coin_a_left,
+                    base_coin_b_left,
+                    limit_lower_index,
+                    limit_upper_index,
+                    clock,
+                    clmm_versioned,
+                    ctx,
+                );
+                coin::join(&mut limit_coin_a_left, coin_a_left);
+                coin::join(&mut limit_coin_b_left, coin_b_left);
+                (limit_lower_index, limit_upper_index , limit_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&nft));
+                fill_clmm_limit_nft(strategy, vault_id, nft);
+                limit_last_tick_index = current_tick_index;
+            } else {
+                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a_left));
+                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b_left));
+            }
+        };
+        merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_a_left));
+        merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b_left));
+
+        update_vault_info_with_tick_range(
+            strategy,
+            vault_id,
+            base_lower_index,
+            base_upper_index,
+            base_liquidity,
+            limit_lower_index,
+            limit_upper_index,
+            limit_liquidity,
+            sqrt_price,
+            base_last_tick_index,
+            limit_last_tick_index,
+        );
+
+        update_vault_reward_info(
+            rewarder_manager,
+            strategy,
+            vault_id,
+            clock
+        );
+
         event::emit(DepositEvent {
             vault_id,
             strategy_id: object::id(strategy),
@@ -560,7 +657,8 @@ module turbos_assets_manage::vault {
                 clmm_versioned,
                 ctx,
             );
-            let (base_lower_index, base_upper_index, base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
+            let (base_lower_index, base_upper_index, base_liquidity_new) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
+            base_liquidity = base_liquidity_new;
             coin::join(&mut coin_a_out, base_coin_a);
             coin::join(&mut coin_b_out, base_coin_b);
         };
@@ -580,7 +678,8 @@ module turbos_assets_manage::vault {
                     clmm_versioned,
                     ctx,
                 );
-                let (limit_lower_index, limit_upper_index, limit_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
+                let (limit_lower_index, limit_upper_index, limit_liquidity_new) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
+                limit_liquidity = limit_liquidity_new;
                 coin::join(&mut coin_a_out, limit_coin_a);
                 coin::join(&mut coin_b_out, limit_coin_b);
             };
@@ -735,12 +834,13 @@ module turbos_assets_manage::vault {
         let current_tick_index = pool::get_pool_current_index(clmm_pool);
         let base_last_tick_index = vault_info.base_last_tick_index;
         let base_rebalance = false;
+        let base_just_increase = false;
         let base_lower_index = vault_info.base_lower_index;
         let base_upper_index = vault_info.base_upper_index;
         let base_tick_step = vault_info.base_tick_step;
         let limit_tick_step = vault_info.limit_tick_step;
-        let base_tick_length = base_tick_step * strategy.tick_space;
-        let limit_tick_length = limit_tick_step * strategy.tick_space;
+        let base_tick_length = base_tick_step * strategy.tick_spacing;
+        let limit_tick_length = limit_tick_step * strategy.tick_spacing;
         let max_base_tick_move = full_math_u32::mul_div_floor(base_tick_length, vault_info.base_rebalance_threshold, 100);
         let base_tick_move =  if (i32::gt(current_tick_index, base_last_tick_index)) {
             i32::abs_u32(i32::sub(current_tick_index, base_last_tick_index))
@@ -751,34 +851,35 @@ module turbos_assets_manage::vault {
             base_rebalance = true;
         };
         if (base_rebalance) {
-            (base_lower_index, base_upper_index) = calculate_tick_index(current_tick_index, strategy.tick_space, base_tick_step);
+            (base_lower_index, base_upper_index) = calculate_tick_index(current_tick_index, strategy.tick_spacing, base_tick_step);
         };
 
         let limit_rebalance = false;
         let limit_lower_index = vault_info.limit_lower_index;
         let limit_upper_index = vault_info.limit_upper_index;
-        if (is_clmm_limit_nft_exists(strategy, vault_id)) {
-            if (base_rebalance) {
-                limit_rebalance = true;
+        // If the base position needs to be rebalanced, then the limit position also needs to be.
+        if (base_rebalance) {
+            limit_rebalance = true;
+        };
+        if (is_clmm_limit_nft_exists(strategy, vault_id) && !base_rebalance) {
+            let limit_last_tick_index = vault_info.limit_last_tick_index;
+            let max_limit_tick_move = full_math_u32::mul_div_floor(limit_tick_length, vault_info.limit_rebalance_threshold, 100);
+            let limit_tick_move =  if (i32::gt(current_tick_index, limit_last_tick_index)) {
+                i32::abs_u32(i32::sub(current_tick_index, limit_last_tick_index))
             } else {
-                let limit_last_tick_index = vault_info.limit_last_tick_index;
-                let max_limit_tick_move = full_math_u32::mul_div_floor(limit_tick_length, vault_info.limit_rebalance_threshold, 100);
-                let limit_tick_move =  if (i32::gt(current_tick_index, limit_last_tick_index)) {
-                    i32::abs_u32(i32::sub(current_tick_index, limit_last_tick_index))
-                } else {
-                    i32::abs_u32(i32::sub(limit_last_tick_index, current_tick_index))
-                };
-                if (limit_tick_move >= max_limit_tick_move) {
-                    base_rebalance = true;
-                };
+                i32::abs_u32(i32::sub(limit_last_tick_index, current_tick_index))
+            };
+            if (limit_tick_move >= max_limit_tick_move) {
+                limit_rebalance = true;
+                //The base rebalance triggered by the limit rebalance does not need to change the tick range.
+                //Only increase liquidity collected from limit.
+                base_rebalance = true;
+                base_just_increase = true;
             };
         };
 
         if (limit_rebalance) {
-            //The base rebalance triggered by the limit rebalance does not need to change the tick range.
-            //Only increase liquidity collected from limit.
-            base_rebalance = true;
-            (limit_lower_index, limit_upper_index) = calculate_tick_index(current_tick_index, strategy.tick_space, limit_tick_step);
+            (limit_lower_index, limit_upper_index) = calculate_tick_index(current_tick_index, strategy.tick_spacing, limit_tick_step);
         };
 
         CheckRebalance {
@@ -786,50 +887,14 @@ module turbos_assets_manage::vault {
             base_rebalance,
             base_lower_index,
             base_upper_index,
+            base_just_increase,
             limit_rebalance,
             limit_lower_index,
             limit_upper_index
         }
     }
 
-    fun calculate_tick_index(
-        curent_index: I32,
-        tick_space: u32,
-        step: u32,
-    ): (I32, I32) {
-        // lower_index = (curent_index - (curent_index % tick_space)) - (step + 1) * tick_space
-        // upper_index = (curent_index - (curent_index % tick_space)) + (step + 1) * tick_space
-        let remainder = i32::sub(curent_index, i32::mod(curent_index, i32::from_u32(tick_space)));
-        let step_i32 = i32::from_u32(step + 1);
-        let lower_index = i32::sub(remainder, i32::mul(i32::from_u32(tick_space), step_i32));
-        let upper_index = i32::add(remainder, i32::mul(i32::from_u32(tick_space), step_i32));
-
-        (lower_index, upper_index)
-    }
-
-    fun floor_tick_index(
-        tick_index: I32,
-        tick_space: u32,
-        is_lower: bool,
-    ): I32 {
-        let tick_space_i32 = i32::from(tick_space);
-        if (i32::eq(i32::mod(tick_index, tick_space_i32), i32::zero())) {
-            return tick_index
-        };
-        let remainder = i32::sub(tick_index, i32::mod(tick_index, tick_space_i32));
-        if (i32::gt(tick_index, i32::zero())) {
-            if (!is_lower) {
-                remainder = i32::add(remainder, tick_space_i32)
-            }
-        } else {
-            if (is_lower) {
-                remainder = i32::sub(remainder, tick_space_i32)
-            }
-        };
-
-        remainder
-    }
-
+    
     public fun rebalance<CoinTypeA, CoinTypeB, FeeType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
@@ -837,6 +902,7 @@ module turbos_assets_manage::vault {
         strategy: &mut Strategy,
         vault_id: ID,
         base_rebalance: bool,
+        base_just_increase: bool,
         base_lower_index: I32,
         base_upper_index: I32,
         limit_rebalance: bool,
@@ -856,6 +922,7 @@ module turbos_assets_manage::vault {
             base_rebalance,
             base_lower_index,
             base_upper_index,
+            base_just_increase,
             limit_rebalance,
             limit_lower_index,
             limit_upper_index
@@ -864,20 +931,22 @@ module turbos_assets_manage::vault {
         let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
         let current_tick_index = pool::get_pool_current_index(clmm_pool);
 
-        check_tick_range(
-            strategy.base_tick_step_minimum,
-            current_tick_index,
-            base_lower_index,
-            base_upper_index,
-            strategy.tick_space,
-        );
+        if (!checkRebalance.base_just_increase) {
+            check_tick_range(
+                strategy.base_tick_step_minimum,
+                current_tick_index,
+                base_lower_index,
+                base_upper_index,
+                strategy.tick_spacing,
+            );
+        };
 
         check_tick_range(
             strategy.limit_tick_step_minimum,
             current_tick_index,
             limit_lower_index,
             limit_upper_index,
-            strategy.tick_space,
+            strategy.tick_spacing,
         );
 
         if (!checkRebalance.base_rebalance && !checkRebalance.limit_rebalance) {
@@ -898,19 +967,21 @@ module turbos_assets_manage::vault {
         let base_last_tick_index = get_vault_base_last_tick_index(strategy, vault_id);
         let limit_last_tick_index = get_vault_limit_last_tick_index(strategy, vault_id);
 
-        if (checkRebalance.limit_rebalance) {
+        //burn limit position first
+        if (is_clmm_limit_nft_exists(strategy, vault_id) && checkRebalance.limit_rebalance) {
             let limit_nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
-            let (_, _, liquidity_limit) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
-            if (liquidity_limit > 0) {
+            let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
+            if (liquidity > 0) {
                 let (limit_coin_a, limit_coin_b) = decrease_clmm_liquidity(
                     limit_nft,
                     clmm_pool,
                     clmm_positions,
-                    liquidity_limit,
+                    liquidity,
                     clock,
                     clmm_versioned,
                     ctx,
                 );
+                limit_liquidity = 0;
                 merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_a));
                 merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b));
             };
@@ -922,76 +993,106 @@ module turbos_assets_manage::vault {
                 ctx
             );
         };
+        let (limit_lower_index, limit_upper_index) = (checkRebalance.limit_lower_index, checkRebalance.limit_upper_index);
         if (checkRebalance.base_rebalance) {
-            let (coin_a_left, coin_b_left);
-            if (i32::eq(get_vault_base_lower_index(strategy, vault_id), checkRebalance.base_lower_index) && i32::eq(get_vault_base_upper_index(strategy, vault_id), checkRebalance.base_upper_index)) {
-                //just increase
-                let coin_a = coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx);
-                let coin_b = coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx);
-                let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
-                (coin_a_left, coin_b_left) = increase_clmm_liquidity(
-                    nft,
-                    clmm_pool,
-                    clmm_positions,
-                    coin_a,
-                    coin_b,
-                    clock,
-                    clmm_versioned,
-                    ctx,
-                );
-                (_,_ , base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
-            } else {
-                //burn current base position
-                let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
-                let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
-                let (base_coin_a, base_coin_b) = decrease_clmm_liquidity(
-                    nft,
-                    clmm_pool,
-                    clmm_positions,
-                    liquidity,
-                    clock,
-                    clmm_versioned,
-                    ctx,
-                );
-                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a));
-                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b));
-                burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
-                    strategy,
-                    vault_id,
-                    clmm_positions,
-                    clmm_versioned,
-                    ctx
-                );
-                let new_nft;
-                (new_nft, coin_a_left, coin_b_left) = mint_clmm_liquidity(
-                    clmm_pool,
-                    clmm_positions,
-                    coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx),
-                    coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx),
-                    checkRebalance.base_lower_index,
-                    checkRebalance.base_upper_index,
-                    clock,
-                    clmm_versioned,
-                    ctx,
-                );
-                (_,_ , base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&new_nft));
-                fill_clmm_base_nft(strategy, vault_id, new_nft);
-                base_last_tick_index = current_tick_index;
+            if (is_clmm_base_nft_exists(strategy, vault_id)) {
+                let coin_a_left = coin::zero<CoinTypeA>(ctx);
+                let coin_b_left = coin::zero<CoinTypeB>(ctx);
+                if (checkRebalance.base_just_increase) {
+                    //just increase
+                    let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
+                    let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
+                    let liquidity = calculate_liquidity(sqrt_price, base_lower_index, base_upper_index, amount_a, amount_b);
+                    //let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
+                    if (liquidity > 0) {
+                        let coin_a = coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx);
+                        let coin_b = coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx);
+                        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
+                        let (base_coin_a_left, base_coin_b_left) = increase_clmm_liquidity(
+                            nft,
+                            clmm_pool,
+                            clmm_positions,
+                            coin_a,
+                            coin_b,
+                            clock,
+                            clmm_versioned,
+                            ctx,
+                        );
+                        coin::join(&mut coin_a_left, base_coin_a_left);
+                        coin::join(&mut coin_b_left, base_coin_b_left);
+                        (_,_ , base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
+                    };
+                } else {
+                    //burn current base position
+                    let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
+                    let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
+                    let (base_coin_a, base_coin_b) = decrease_clmm_liquidity(
+                        nft,
+                        clmm_pool,
+                        clmm_positions,
+                        liquidity,
+                        clock,
+                        clmm_versioned,
+                        ctx,
+                    );
+                    merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a));
+                    merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b));
+                    burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
+                        strategy,
+                        vault_id,
+                        clmm_positions,
+                        clmm_versioned,
+                        ctx
+                    );
+                    base_liquidity = 0;
+                    let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
+                    let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
+                    let liquidity = calculate_liquidity(sqrt_price, checkRebalance.base_lower_index, checkRebalance.base_upper_index, amount_a, amount_b);
+                    if (liquidity > 0) {
+                        let (new_nft, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
+                            clmm_pool,
+                            clmm_positions,
+                            coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx),
+                            coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx),
+                            checkRebalance.base_lower_index,
+                            checkRebalance.base_upper_index,
+                            clock,
+                            clmm_versioned,
+                            ctx,
+                        );
+
+                        coin::join(&mut coin_a_left, limit_coin_a_left);
+                        coin::join(&mut coin_b_left, limit_coin_b_left);
+                        (_,_ , base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&new_nft));  
+                        fill_clmm_base_nft(strategy, vault_id, new_nft);
+                    };
+                    base_last_tick_index = current_tick_index;
+                };
+                merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a_left));
+                merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b_left));
             };
 
-            if (coin::value(&coin_a_left) > 0 || coin::value(&coin_b_left) > 0) {
-                if (coin::value(&coin_a_left) > 0) {
-                    let limit_lower_index = floor_tick_index(current_tick_index, strategy.tick_space, true);
-                    let limit_upper_index = checkRebalance.limit_upper_index;
+            let coin_a = coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx);
+            let coin_b = coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx);
+            let amount_a = coin::value(&coin_a);
+            let amount_b = coin::value(&coin_b);
+            let bid_lower_index = checkRebalance.limit_lower_index;
+            let bid_upper_index = floor_tick_index(current_tick_index, strategy.tick_spacing, true);
+            let ask_lower_index = floor_tick_index(current_tick_index, strategy.tick_spacing, false);
+            let ask_upper_index = checkRebalance.limit_upper_index;
+            let bid_liquidity = calculate_liquidity(sqrt_price, bid_lower_index, bid_upper_index, amount_a, amount_b);
+            let ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a, amount_b);
+            if (bid_liquidity > 0 || ask_liquidity > 0) {
+                (limit_lower_index, limit_upper_index) = if (bid_liquidity > ask_liquidity) {
+                    (bid_lower_index, bid_upper_index)
                 } else {
-                    let limit_lower_index = checkRebalance.limit_lower_index;
-                    let limit_upper_index = floor_tick_index(current_tick_index, strategy.tick_space, false);
+                    (ask_lower_index, ask_upper_index)
                 };
                 let (nft_limit, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
                     clmm_pool,
                     clmm_positions,
-                    coin_a_left,
-                    coin_b_left,
+                    coin_a,
+                    coin_b,
                     limit_lower_index,
                     limit_upper_index,
                     clock,
@@ -1005,8 +1106,8 @@ module turbos_assets_manage::vault {
                 merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_a_left));
                 merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b_left));
             } else {
-                merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a_left));
-                merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b_left));
+                merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
+                merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b));
             };
         };
         update_vault_info_with_tick_range(
@@ -1015,8 +1116,8 @@ module turbos_assets_manage::vault {
             checkRebalance.base_lower_index,
             checkRebalance.base_upper_index,
             base_liquidity,
-            checkRebalance.limit_lower_index,
-            checkRebalance.limit_upper_index,
+            limit_lower_index,
+        limit_upper_index,
             limit_liquidity,
             sqrt_price,
             base_last_tick_index,
@@ -1039,189 +1140,58 @@ module turbos_assets_manage::vault {
         });
     }
 
-    public fun mint_liquidity<CoinTypeA, CoinTypeB, FeeType>(
-        global_config: &GlobalConfig,
-        rewarder_manager: &mut RewarderManager,
-        strategy: &mut Strategy,
-        vault: &mut Vault,
-        base_lower_index: I32,
-        base_upper_index: I32,
-        limit_lower_index: I32,
-        limit_upper_index: I32,
-        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
-        clmm_positions: &mut Positions,
-        coin_a: Coin<CoinTypeA>, 
-        coin_b: Coin<CoinTypeB>, 
-        clock: &Clock,
-        clmm_versioned: &Versioned,
-        ctx: &mut TxContext
-    ) {
-        config::checked_package_version(global_config);
-        let sender = tx_context::sender(ctx);
-        let vault_id = object::id(vault);
-        assert!(coin::value(&coin_a) > 0 || coin::value(&coin_b) > 0, EInvalidAmount);
-        let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
-        let current_tick_index = pool::get_pool_current_index(clmm_pool);
+    public fun calculate_tick_index(
+        curent_index: I32,
+        tick_spacing: u32,
+        step: u32,
+    ): (I32, I32) {
+        // lower_index = (curent_index - (curent_index % tick_spacing)) - (step + 1) * tick_spacing
+        // upper_index = (curent_index - (curent_index % tick_spacing)) + (step + 1) * tick_spacing
+        let remainder = i32::sub(curent_index, i32::mod(curent_index, i32::from_u32(tick_spacing)));
+        let step_i32 = i32::from_u32(step + 1);
+        let lower_index = i32::sub(remainder, i32::mul(i32::from_u32(tick_spacing), step_i32));
+        let upper_index = i32::add(remainder, i32::mul(i32::from_u32(tick_spacing), step_i32));
 
-        check_tick_range(
-            strategy.base_tick_step_minimum,
-            current_tick_index,
-            base_lower_index,
-            base_upper_index,
-            strategy.tick_space,
-        );
-
-        check_tick_range(
-            strategy.limit_tick_step_minimum,
-            current_tick_index,
-            limit_lower_index,
-            limit_upper_index,
-            strategy.tick_space,
-        );
-
-        let (nft, coin_a_left, coin_b_left) = mint_clmm_liquidity(
-            clmm_pool,
-            clmm_positions,
-            coin_a,
-            coin_b,
-            base_lower_index,
-            base_upper_index,
-            clock,
-            clmm_versioned,
-            ctx,
-        );
-        let (_,_ , base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&nft));
-        fill_clmm_base_nft(strategy, vault_id, nft);
-        let base_last_tick_index = current_tick_index;
-
-        let limit_liquidity = 0;
-        let limit_last_tick_index = get_vault_limit_last_tick_index(strategy, vault_id);
-        let amount_a = (coin::value(&coin_a_left) as u128);
-        let amount_b = (coin::value(&coin_b_left) as u128);
-        let bid_lower_index = limit_lower_index;
-        let bid_upper_index = floor_tick_index(current_tick_index, strategy.tick_space, true);
-        let ask_lower_index = floor_tick_index(current_tick_index, strategy.tick_space, false);
-        let ask_upper_index = limit_upper_index;
-        let bid_liquidity = math_liquidity::get_liquidity_for_amounts(sqrt_price, math_tick::sqrt_price_from_tick_index(bid_lower_index), math_tick::sqrt_price_from_tick_index(bid_upper_index), amount_a, amount_b);
-        let ask_liquidity = math_liquidity::get_liquidity_for_amounts(sqrt_price, math_tick::sqrt_price_from_tick_index(ask_lower_index), math_tick::sqrt_price_from_tick_index(ask_upper_index), amount_a, amount_b);
-        if (bid_liquidity > 0 || ask_liquidity > 0) {
-            if (bid_liquidity > ask_liquidity) {
-                limit_lower_index = bid_lower_index;
-                limit_upper_index = bid_upper_index;
-            } else {
-                limit_lower_index = ask_lower_index;
-                limit_upper_index = ask_upper_index;
-            };
-            let (nft_limit, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
-                clmm_pool,
-                clmm_positions,
-                coin_a_left,
-                coin_b_left,
-                limit_lower_index,
-                limit_upper_index,
-                clock,
-                clmm_versioned,
-                ctx,
-            );
-            (_,_ , limit_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&nft_limit));
-            fill_clmm_limit_nft(strategy, vault_id, nft_limit);
-            limit_last_tick_index = current_tick_index;
-
-            merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_a_left));
-            merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b_left));
-        } else {
-            merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a_left));
-            merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b_left));
-        };
-
-        update_vault_info_with_tick_range(
-            strategy,
-            vault_id,
-            base_lower_index,
-            base_upper_index,
-            base_liquidity,
-            limit_lower_index,
-            limit_upper_index,
-            limit_liquidity,
-            sqrt_price,
-            base_last_tick_index,
-            limit_last_tick_index,
-        );
-
-        update_vault_reward_info(
-            rewarder_manager,
-            strategy,
-            vault_id,
-            clock
-        );
+        (lower_index, upper_index)
     }
 
-    public fun increase_liquidity<CoinTypeA, CoinTypeB, FeeType>(
-        global_config: &GlobalConfig,
-        rewarder_manager: &mut RewarderManager,
-        strategy: &mut Strategy,
-        vault: &mut Vault,
-        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
-        clmm_positions: &mut Positions,
-        coin_a: Coin<CoinTypeA>, 
-        coin_b: Coin<CoinTypeB>, 
-        clock: &Clock,
-        clmm_versioned: &Versioned,
-        ctx: &mut TxContext
-    ) {
-        config::checked_package_version(global_config);
-        let sender = tx_context::sender(ctx);
-        let vault_id = object::id(vault);
-        assert!(coin::value(&coin_a) > 0 || coin::value(&coin_b) > 0, EInvalidAmount);
-        let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
-        // Add liquidity to existing base positions
-        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
-        let (coin_a_left, coin_b_left) = increase_clmm_liquidity(
-            nft,
-            clmm_pool,
-            clmm_positions,
-            coin_a,
-            coin_b,
-            clock,
-            clmm_versioned,
-            ctx,
-        );
-        let (base_lower_index, base_upper_index, base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
-        let limit_liquidity = 0;
-        if (is_clmm_limit_nft_exists(strategy, vault_id)) {
-            let limit_nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
-            let (limit_coin_a_left, limit_coin_b_left) = increase_clmm_liquidity(
-                limit_nft,
-                clmm_pool,
-                clmm_positions,
-        coin_a_left,
-            coin_b_left,
-                clock,
-            clmm_versioned,
-                ctx,
-            );
-            let (limit_lower_index, limit_upper_index, limit_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(limit_nft));
-            merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_a_left));
-            merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b_left));
+    public fun floor_tick_index(
+        tick_index: I32,
+        tick_spacing: u32,
+        is_lower: bool,
+    ): I32 {
+        let tick_spacing_i32 = i32::from(tick_spacing);
+        if (i32::eq(i32::mod(tick_index, tick_spacing_i32), i32::zero())) {
+            return tick_index
+        };
+        let remainder = i32::sub(tick_index, i32::mod(tick_index, tick_spacing_i32));
+        if (i32::gt(tick_index, i32::zero())) {
+            if (!is_lower) {
+                remainder = i32::add(remainder, tick_spacing_i32)
+            }
         } else {
-            merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a_left));
-            merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b_left));            
+            if (is_lower) {
+                remainder = i32::sub(remainder, tick_spacing_i32)
+            }
         };
 
-        update_vault_info(
-            strategy,
-            vault_id,
-            base_liquidity,
-            limit_liquidity,
-            sqrt_price,
-        );
+        remainder
+    }
 
-        update_vault_reward_info(
-            rewarder_manager,
-            strategy,
-            vault_id,
-            clock
-        );
+    fun calculate_liquidity(
+        sqrt_price: u128,
+        tick_lower: I32,
+        tick_upper: I32,
+        amount_a: u64,
+        amount_b: u64,
+    ): u128 {
+        math_liquidity::get_liquidity_for_amounts(
+            sqrt_price, 
+            math_tick::sqrt_price_from_tick_index(tick_lower), 
+            math_tick::sqrt_price_from_tick_index(tick_upper), 
+            (amount_a as u128), 
+            (amount_b as u128)
+        )
     }
 
     public(friend) fun collect_protocol_fee<BalanceType>(
@@ -1243,13 +1213,13 @@ module turbos_assets_manage::vault {
         current_index: I32,
         lower_index: I32,
         upper_index: I32,
-        tick_space: u32,
+        tick_spacing: u32,
     ) {
-        let tick_space_i32 = i32::from_u32(tick_space);
+        let tick_spacing_i32 = i32::from_u32(tick_spacing);
         assert!(i32::lt(lower_index, current_index) && i32::lt(current_index, upper_index), EInvalidTickRange);
         let (minimum_lower_index, minimum_upper_index) = calculate_tick_index(
             current_index,
-            tick_space,
+            tick_spacing,
             tick_step_minimum
         );
 
@@ -2243,7 +2213,7 @@ module turbos_assets_manage::vault {
         table::borrow_mut(&mut strategy.accounts, vault_id)
     }
 
-    fun  borrow_vault_account(
+    public fun  borrow_vault_account(
         strategy: &Strategy,
         vault_id: ID,
     ): &Account {
@@ -2257,7 +2227,7 @@ module turbos_assets_manage::vault {
         linked_table::borrow_mut(&mut strategy.vaults, vault_id)
     }
 
-    fun  borrow_vault_info(
+    public fun  borrow_vault_info(
         strategy: &Strategy,
         vault_id: ID,
     ): &VaultInfo {
@@ -2376,6 +2346,61 @@ module turbos_assets_manage::vault {
         }
     }
 
+    public fun get_vault_total_amount<CoinTypeA, CoinTypeB, FeeType>(
+        strategy: &Strategy,
+        clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
+        vault_id: ID,
+    ): (u64, u64) {
+        let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
+        let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
+        let vault_info = linked_table::borrow(&strategy.vaults, vault_id);
+        let base_liquidity = vault_info.base_liquidity;
+        let limit_liquidity = vault_info.limit_liquidity;
+        let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
+        if (base_liquidity > 0) {
+            let (base_amount_a, base_amount_b) = math_liquidity::get_amount_for_liquidity(
+                sqrt_price,
+                math_tick::sqrt_price_from_tick_index(vault_info.base_lower_index),
+                math_tick::sqrt_price_from_tick_index(vault_info.base_upper_index),
+                base_liquidity
+            );
+            amount_a = amount_a + (base_amount_a as u64);
+            amount_b = amount_b + (base_amount_b as u64);
+        };
+        if (limit_liquidity > 0) {
+            let (limit_amount_a, limit_amount_b) = math_liquidity::get_amount_for_liquidity(
+                sqrt_price,
+                math_tick::sqrt_price_from_tick_index(vault_info.base_lower_index),
+                math_tick::sqrt_price_from_tick_index(vault_info.base_upper_index),
+                base_liquidity
+            );
+            amount_a = amount_a + (limit_amount_a as u64);
+            amount_b = amount_b + (limit_amount_b as u64);
+        };
+
+        (amount_a, amount_b)
+    }
+
+    public fun get_strategy_tick_spacing(
+        strategy: &Strategy,
+    ): u32 {
+        strategy.tick_spacing
+    }
+
+    public fun get_check_rebalance_info(
+        check_rebalance: &CheckRebalance
+    ): (bool, I32, I32, bool, bool, I32, I32) {
+        (
+            check_rebalance.base_rebalance,
+            check_rebalance.base_lower_index,
+            check_rebalance.base_upper_index,
+            check_rebalance.base_just_increase,
+            check_rebalance.limit_rebalance,
+            check_rebalance.limit_lower_index,
+            check_rebalance.limit_upper_index,
+        )
+    }
+
     fun  init_account_balance(
         strategy: &mut Strategy,
         vault_id: ID,
@@ -2398,73 +2423,78 @@ module turbos_assets_manage::vault {
         self
     }
 
+    #[test_only]
+    public fun init_for_testing(ctx: &mut TxContext) {
+        init(VAULT{} ,ctx);
+    }
+
     #[test]
     fun test_floor_tick_index() {
-        let (curent_index, tick_space) = (
+        let (curent_index, tick_spacing) = (
             i32::from(10), 
             10, 
         );
-        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, false);
         assert!(i32::eq(tick_index, i32::from(10)), 1);
-        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, true);
         assert!(i32::eq(tick_index, i32::from(10)), 1);
 
-        let (curent_index, tick_space) = (
+        let (curent_index, tick_spacing) = (
             i32::from(11), 
             10, 
         );
-        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, false);
         assert!(i32::eq(tick_index, i32::from(20)), 1);
-        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, true);
         assert!(i32::eq(tick_index, i32::from(10)), 1);
 
-        let (curent_index, tick_space) = (
+        let (curent_index, tick_spacing) = (
             i32::from(9), 
             10, 
         );
-        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, false);
         assert!(i32::eq(tick_index, i32::from(10)), 1);
-        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, true);
         assert!(i32::eq(tick_index, i32::from(0)), 1);
 
-        let (curent_index, tick_space) = (
+        let (curent_index, tick_spacing) = (
             i32::neg_from(10), 
             10, 
         );
-        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, false);
         assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
-        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, true);
         assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
 
-        let (curent_index, tick_space) = (
+        let (curent_index, tick_spacing) = (
             i32::neg_from(11), 
             10, 
         );
-        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, false);
         assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
-        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, true);
         assert!(i32::eq(tick_index, i32::neg_from(20)), 1);
 
-        let (curent_index, tick_space) = (
+        let (curent_index, tick_spacing) = (
             i32::neg_from(9), 
             10, 
         );
-        let tick_index = floor_tick_index(curent_index, tick_space, false);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, false);
         assert!(i32::eq(tick_index, i32::from(0)), 1);
-        let tick_index = floor_tick_index(curent_index, tick_space, true);
+        let tick_index = floor_tick_index(curent_index, tick_spacing, true);
         assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
     }
 
     #[test]
     fun test_calculate_tick_index() {
-        let (curent_index, tick_space, step) = (
+        let (curent_index, tick_spacing, step) = (
             i32::from(10), 
             10, 
             0
         );
         let (lower_index, upper_index) = calculate_tick_index(
             curent_index,
-            tick_space,
+            tick_spacing,
             step,
         );
         assert!(i32::eq(lower_index, i32::from(0)), 1);
@@ -2473,7 +2503,7 @@ module turbos_assets_manage::vault {
         curent_index = i32::neg_from(10);
         (lower_index, upper_index) = calculate_tick_index(
             curent_index,
-            tick_space,
+            tick_spacing,
             step,
         );
         assert!(i32::eq(lower_index, i32::neg_from(20)), 1);
@@ -2482,7 +2512,7 @@ module turbos_assets_manage::vault {
         curent_index = i32::from(9);
         (lower_index, upper_index) = calculate_tick_index(
             curent_index,
-            tick_space,
+            tick_spacing,
             step,
         );
         assert!(i32::eq(lower_index, i32::neg_from(10)), 1);
@@ -2491,7 +2521,7 @@ module turbos_assets_manage::vault {
         curent_index = i32::neg_from(9);
         (lower_index, upper_index) = calculate_tick_index(
             curent_index,
-            tick_space,
+            tick_spacing,
             step,
         );
         assert!(i32::eq(lower_index, i32::neg_from(10)), 1);

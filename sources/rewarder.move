@@ -378,4 +378,9 @@ module turbos_assets_manage::rewarder {
         let rewarder = linked_table::borrow<TypeName, Rewarder>(&manager.rewarders, type_name);
         linked_table::contains<ID, StrategyRewarderInfo>(&rewarder.strategys, strategy_id)
     }
+
+    #[test_only]
+    public fun init_for_testing(ctx: &mut TxContext) {
+        init(ctx);
+    }
 }

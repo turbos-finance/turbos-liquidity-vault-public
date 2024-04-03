@@ -149,4 +149,9 @@ module turbos_assets_manage::config {
     public fun checked_package_version(global_config: &GlobalConfig) {
         assert!(global_config.package_version == VERSION, EWrongVersion);
     }
+
+    #[test_only]
+    public fun init_for_testing(ctx: &mut TxContext) {
+        init(ctx);
+    }
 }
