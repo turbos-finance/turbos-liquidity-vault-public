@@ -241,6 +241,52 @@ module turbos_assets_manage::router {
         transfer::public_transfer(coin_b, recipient);
     }
 
+    entry public fun rebalance<CoinTypeA, CoinTypeB, FeeType>(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
+        strategy: &mut Strategy,
+        vault_id: ID,
+        rebalance: bool,
+        base_just_increase: bool,
+        base_tick_lower_index_u32: u32,
+        base_tick_lower_index_is_neg: bool,
+        base_tick_upper_index_u32: u32,
+        base_tick_upper_index_is_neg: bool,
+        limit_tick_lower_index_u32: u32,
+        limit_tick_lower_index_is_neg: bool,
+        limit_tick_upper_index_u32: u32,
+        limit_tick_upper_index_is_neg: bool,
+        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
+        clmm_positions: &mut Positions,
+        clock: &Clock,
+        clmm_versioned: &Versioned,
+        ctx: &mut TxContext
+    ) {
+        vault::rebalance(
+            operator_cap,
+            global_config,
+            rewarder_manager,
+            strategy,
+            vault_id,
+            rebalance,
+            base_just_increase,
+            base_tick_lower_index_u32,
+            base_tick_lower_index_is_neg,
+            base_tick_upper_index_u32,
+            base_tick_upper_index_is_neg,
+            limit_tick_lower_index_u32,
+            limit_tick_lower_index_is_neg,
+            limit_tick_upper_index_u32,
+            limit_tick_upper_index_is_neg,
+            clmm_pool,
+            clmm_positions,
+            clock,
+            clmm_versioned,
+            ctx
+        );
+    }
+
     entry public fun collect_clmm_reward_direct_return<CoinTypeA, CoinTypeB, FeeType, RewardCoinType>(
         global_config: &GlobalConfig,
         strategy: &mut Strategy,

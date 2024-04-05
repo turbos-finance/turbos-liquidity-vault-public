@@ -357,9 +357,8 @@ module turbos_clmm::vault_tests {
                 &mut clmm_pool,
                 test_scenario::ctx(scenario),
             );
-            let (base_rebalance,_,_,_,limit_rebalance,_,_) = vault::get_check_rebalance_info(&check_rebalance);
-            assert_eq(base_rebalance, false);
-            assert_eq(base_rebalance, false);
+            let (rebalance,_,_,_,_,_) = vault::get_check_rebalance_info(&check_rebalance);
+            assert_eq(rebalance, false);
 
             //current tick index is 0, need move 9 * 60 ticks to trigger rebalance
             swap_router::swap_b_a(
@@ -388,9 +387,8 @@ module turbos_clmm::vault_tests {
                 &mut clmm_pool,
                 test_scenario::ctx(scenario),
             );
-            let (base_rebalance,base_lower_index,base_upper_index, _, limit_rebalance,_,_) = vault::get_check_rebalance_info(&check_rebalance);
-            assert_eq(base_rebalance, false);
-            assert_eq(base_rebalance, false);
+            let (rebalance,base_lower_index,base_upper_index, base_just_increase,limit_lower_index,limit_upper_index) = vault::get_check_rebalance_info(&check_rebalance);
+            assert_eq(rebalance, false);
 
             swap_router::swap_b_a(
                 &mut clmm_pool,
@@ -417,9 +415,8 @@ module turbos_clmm::vault_tests {
                 &mut clmm_pool,
                 test_scenario::ctx(scenario),
             );
-            let (base_rebalance,base_lower_index,base_upper_index, base_just_increase, limit_rebalance,limit_lower_index,limit_upper_index) = vault::get_check_rebalance_info(&check_rebalance);
-            assert_eq(base_rebalance, true);
-            assert_eq(limit_rebalance, true);
+            let (rebalance,base_lower_index,base_upper_index, base_just_increase,limit_lower_index,limit_upper_index) = vault::get_check_rebalance_info(&check_rebalance);
+            assert_eq(rebalance, true);
 
             //rebalance
             vault::rebalance(
@@ -428,13 +425,16 @@ module turbos_clmm::vault_tests {
                 &mut rewarder_manager,
                 &mut strategy,
                 vault_id,
-                base_rebalance,
+                rebalance,
                 base_just_increase,
-                base_lower_index,
-                base_upper_index,
-                limit_rebalance,
-                limit_lower_index,
-                limit_upper_index,
+                i32::abs_u32(base_lower_index),
+                i32::is_neg(base_lower_index),
+                i32::abs_u32(base_upper_index),
+                i32::is_neg(base_upper_index),
+                i32::abs_u32(limit_lower_index),
+                i32::is_neg(limit_lower_index),
+                i32::abs_u32(limit_upper_index),
+                i32::is_neg(limit_upper_index),
                 &mut clmm_pool,
                 &mut clmm_positions,
                 &clock,
@@ -476,15 +476,13 @@ module turbos_clmm::vault_tests {
                 &mut clmm_pool,
                 test_scenario::ctx(scenario),
             );
-            let (base_rebalance,base_lower_index,base_upper_index, base_just_increase, limit_rebalance,limit_lower_index,limit_upper_index) = vault::get_check_rebalance_info(&check_rebalance);
-            //base tick range not change
+            let (rebalance,base_lower_index,base_upper_index, base_just_increase,limit_lower_index,limit_upper_index) = vault::get_check_rebalance_info(&check_rebalance);            //base tick range not change
             assert_eq(base_lower_index, i32::neg_from(180));
             assert_eq(base_upper_index, i32::from(1140));
             assert_eq(limit_lower_index, i32::from(420));
             assert_eq(limit_upper_index, i32::from(900));
-            assert_eq(base_rebalance, true);
+            assert_eq(rebalance, true);
             assert_eq(base_just_increase, true);
-            assert_eq(limit_rebalance, true);
 
             //rebalance
             vault::rebalance(
@@ -493,19 +491,21 @@ module turbos_clmm::vault_tests {
                 &mut rewarder_manager,
                 &mut strategy,
                 vault_id,
-                base_rebalance,
+                rebalance,
                 base_just_increase,
-                base_lower_index,
-                base_upper_index,
-                limit_rebalance,
-                limit_lower_index,
-                limit_upper_index,
+                i32::abs_u32(base_lower_index),
+                i32::is_neg(base_lower_index),
+                i32::abs_u32(base_upper_index),
+                i32::is_neg(base_upper_index),
+                i32::abs_u32(limit_lower_index),
+                i32::is_neg(limit_lower_index),
+                i32::abs_u32(limit_upper_index),
+                i32::is_neg(limit_upper_index),
                 &mut clmm_pool,
                 &mut clmm_positions,
                 &clock,
                 &versioned,
                 test_scenario::ctx(scenario),
-
             );
 
             assert_eq(vault::get_vault_base_last_tick_index(&strategy, vault_id), i32::from(509));
@@ -542,15 +542,14 @@ module turbos_clmm::vault_tests {
                 &mut clmm_pool,
                 test_scenario::ctx(scenario),
             );
-            let (base_rebalance,base_lower_index,base_upper_index, base_just_increase, limit_rebalance,limit_lower_index,limit_upper_index) = vault::get_check_rebalance_info(&check_rebalance);
+            let (rebalance,base_lower_index,base_upper_index, base_just_increase,limit_lower_index,limit_upper_index) = vault::get_check_rebalance_info(&check_rebalance);            //base tick range not change
             //base tick range not change
             assert_eq(base_lower_index, i32::from(2520));
             assert_eq(base_upper_index, i32::from(3840));
             assert_eq(limit_lower_index, i32::from(2940));
             assert_eq(limit_upper_index, i32::from(3420));
-            assert_eq(base_rebalance, true);
+            assert_eq(rebalance, true);
             assert_eq(base_just_increase, false);
-            assert_eq(limit_rebalance, true);
 
             vault::rebalance(
                 &operator_cap,
@@ -558,13 +557,16 @@ module turbos_clmm::vault_tests {
                 &mut rewarder_manager,
                 &mut strategy,
                 vault_id,
-                base_rebalance,
+                rebalance,
                 base_just_increase,
-                base_lower_index,
-                base_upper_index,
-                limit_rebalance,
-                limit_lower_index,
-                limit_upper_index,
+                i32::abs_u32(base_lower_index),
+                i32::is_neg(base_lower_index),
+                i32::abs_u32(base_upper_index),
+                i32::is_neg(base_upper_index),
+                i32::abs_u32(limit_lower_index),
+                i32::is_neg(limit_lower_index),
+                i32::abs_u32(limit_upper_index),
+                i32::is_neg(limit_upper_index),
                 &mut clmm_pool,
                 &mut clmm_positions,
                 &clock,
