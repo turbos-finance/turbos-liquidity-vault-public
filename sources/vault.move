@@ -207,22 +207,24 @@ module turbos_assets_manage::vault {
         new_rate: u64,
     }
 
-    struct RewarderClaimedEvent has copy, drop {
+    struct ClmmRewardClaimedEvent has copy, drop {
         vault_id: ID,
         strategy_id: ID,
         clmm_pool_id: ID,
         clmm_nft_id: ID,
         amount: u64,
-        reward_type: TypeName,
+        reward_type_name: TypeName,
     }
 
-    struct FeeClaimedEvent has copy, drop {
+    struct ClmmFeeClaimedEvent has copy, drop {
         vault_id: ID,
         strategy_id: ID,
         clmm_pool_id: ID,
         clmm_nft_id: ID,
 	    amount_a: u64,
 	    amount_b: u64,
+        coin_a_type_name: TypeName,
+	    coin_b_type_name: TypeName,
     }
 
     fun init(vault: VAULT, ctx: &mut TxContext) {
@@ -524,11 +526,11 @@ module turbos_assets_manage::vault {
         let limit_last_tick_index = get_vault_limit_last_tick_index(strategy, vault_id);
         let limit_coin_a_left = coin::zero<CoinTypeA>(ctx);
         let limit_coin_b_left = coin::zero<CoinTypeB>(ctx);
-        let amount_a = coin::value(&base_coin_a_left);
-        let amount_b = coin::value(&base_coin_b_left);
+        let amount_a_left = coin::value(&base_coin_a_left);
+        let amount_b_left = coin::value(&base_coin_b_left);
         if (is_clmm_limit_nft_exists(strategy, vault_id)) {
             let nft = borrow_mut_clmm_limit_nft(strategy, vault_id);
-            let liquidity = calculate_liquidity(sqrt_price, limit_lower_index, limit_upper_index, amount_a, amount_b);
+            let liquidity = calculate_liquidity(sqrt_price, limit_lower_index, limit_upper_index, amount_a_left, amount_b_left);
             if (liquidity>0) {
                 let (coin_a_left, coin_b_left) = increase_clmm_liquidity(
                     nft,
@@ -552,8 +554,8 @@ module turbos_assets_manage::vault {
             let bid_upper_index = floor_tick_index(current_tick_index, strategy.tick_spacing, true);
             let ask_lower_index = floor_tick_index(current_tick_index, strategy.tick_spacing, false);
             let ask_upper_index = limit_upper_index;
-            let bid_liquidity = calculate_liquidity(sqrt_price, bid_lower_index, bid_upper_index, amount_a, amount_b);
-            let ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a, amount_b);
+            let bid_liquidity = calculate_liquidity(sqrt_price, bid_lower_index, bid_upper_index, amount_a_left, amount_b_left);
+            let ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a_left, amount_b_left);
             if (bid_liquidity > 0 || ask_liquidity > 0) {
                 (limit_lower_index, limit_upper_index) = if (bid_liquidity > ask_liquidity) {
                     (bid_lower_index, bid_upper_index)
@@ -1220,7 +1222,8 @@ module turbos_assets_manage::vault {
         let (minimum_lower_index, minimum_upper_index) = calculate_tick_index(
             current_index,
             tick_spacing,
-            tick_step_minimum
+            //To avoid slippage
+            tick_step_minimum - 1
         );
 
         assert!(i32::lte(
@@ -1801,13 +1804,13 @@ module turbos_assets_manage::vault {
         let amount = coin::value(&reward_coin);
         update_earn_stats<RewardCoin>(strategy, vault_id, amount);
 
-        event::emit(RewarderClaimedEvent {
+        event::emit(ClmmRewardClaimedEvent {
             vault_id,
             strategy_id,
             clmm_pool_id,
             clmm_nft_id,
             amount,
-            reward_type: type_name::get<RewardCoin>(),
+            reward_type_name: type_name::get<RewardCoin>(),
         });
     
         reward_coin
@@ -1846,13 +1849,13 @@ module turbos_assets_manage::vault {
         let amount = coin::value(&reward_coin);
         update_earn_stats<RewardCoin>(strategy, vault_id, amount);
 
-         event::emit(RewarderClaimedEvent {
+         event::emit(ClmmRewardClaimedEvent {
             vault_id,
             strategy_id,
             clmm_pool_id,
             clmm_nft_id,
             amount,
-            reward_type: type_name::get<RewardCoin>(),
+            reward_type_name: type_name::get<RewardCoin>(),
         });
     
         reward_coin
@@ -1892,13 +1895,15 @@ module turbos_assets_manage::vault {
         update_earn_stats<CoinTypeA>(strategy, vault_id, amount_a);
         update_earn_stats<CoinTypeB>(strategy, vault_id, amount_b);
 
-        event::emit(FeeClaimedEvent {
+        event::emit(ClmmFeeClaimedEvent {
             vault_id,
             strategy_id,
             clmm_pool_id,
             clmm_nft_id,
             amount_a,
-            amount_b
+            amount_b,
+            coin_a_type_name: type_name::get<CoinTypeA>(),
+            coin_b_type_name: type_name::get<CoinTypeB>(),
         })
     }
 
@@ -1936,13 +1941,15 @@ module turbos_assets_manage::vault {
         update_earn_stats<CoinTypeA>(strategy, vault_id, amount_a);
         update_earn_stats<CoinTypeB>(strategy, vault_id, amount_b);
 
-        event::emit(FeeClaimedEvent {
+        event::emit(ClmmFeeClaimedEvent {
             vault_id,
             strategy_id,
             clmm_pool_id,
             clmm_nft_id,
             amount_a,
-            amount_b
+            amount_b,
+            coin_a_type_name: type_name::get<CoinTypeA>(),
+            coin_b_type_name: type_name::get<CoinTypeB>(),
         })
     }
 

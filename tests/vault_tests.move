@@ -595,10 +595,31 @@ module turbos_clmm::vault_tests {
                 test_scenario::ctx(scenario),
             );
 
-            let info = vault::borrow_vault_info(&strategy, vault_id);
-            std::debug::print(info);
+            //withdraw all
+            let (coin_a, coin_b) = vault::withdraw(
+                &global_config,
+                &mut rewarder_manager,
+                &mut strategy,
+                &mut vault,
+                &mut clmm_pool,
+                &mut clmm_positions,
+                100,
+                true,
+                &clock,
+                &versioned,
+                test_scenario::ctx(scenario),
+            );
+            coin::join(&mut btc, coin_a);
+            coin::join(&mut usdc, coin_b);
 
-            transfer::public_share_object(vault);
+            //close vault
+            vault::close_vault<BTC, USDC>(
+                &global_config,
+                &mut strategy,
+                vault,
+                test_scenario::ctx(scenario),
+            );
+
             test_scenario::return_to_sender(scenario, btc);
             test_scenario::return_to_sender(scenario, usdc);
             test_scenario::return_shared(global_config);
