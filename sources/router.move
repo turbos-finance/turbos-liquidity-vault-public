@@ -350,6 +350,20 @@ module turbos_assets_manage::router {
         );
     }
 
+    entry public fun update_strategy_status(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        status: u8,
+    ) {
+        vault::update_strategy_status(
+            operator_cap,
+            global_config,
+            strategy,
+            status
+        );
+    }
+
     entry public fun update_strategy_default_base_rebalance_threshold(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,

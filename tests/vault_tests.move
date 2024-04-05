@@ -187,7 +187,7 @@ module turbos_clmm::vault_tests {
             router::add_operator(
                 &admin_cap, 
                 &mut global_config, 
-                4,
+                7,
                 player,
                 test_scenario::ctx(scenario),
             );
@@ -216,8 +216,8 @@ module turbos_clmm::vault_tests {
                 MAX_TICK_INDEX,
                 false,
                 string::utf8(b"https://xx"),
-                80,
-                80,
+                80, //80%
+                80, //80%
                 10,
                 3,
                 test_scenario::ctx(scenario),
@@ -534,7 +534,7 @@ module turbos_clmm::vault_tests {
             let current_tick_index = pool::get_pool_current_index(&clmm_pool);
             assert_eq(i32::as_u32(current_tick_index), 3221);
 
-            //index from 509 to 663, trigger, threshold: 180 * 0.8 = 144
+            //index from 663 to 3221, trigger
             let check_rebalance = vault::check_rebalance(
                 &global_config,
                 &mut strategy,
@@ -581,6 +581,82 @@ module turbos_clmm::vault_tests {
             assert_eq(vault::get_vault_base_upper_index(&strategy, vault_id), i32::from(3840));
             assert_eq(vault::get_vault_limit_lower_index(&strategy, vault_id), i32::from(2940));
             assert_eq(vault::get_vault_limit_upper_index(&strategy, vault_id), i32::from(3180));
+
+            //update update_vault_limit_rebalance_threshold to 50%
+            router::update_vault_limit_rebalance_threshold(
+                &operator_cap,
+                &global_config,
+                &mut strategy,
+                vault_id,
+                50,
+            );
+
+            //forward index from 3221 to 3124, trigger limit rebalance
+            swap_router::swap_a_b(
+                &mut clmm_pool,
+                tools_tests::coin_to_vec(coin::split(&mut btc, 35000000, test_scenario::ctx(scenario))),
+                35000000, //amount_in 
+                1, //amount_threshold
+                MIN_SQRT_PRICE_X64 + 1,
+                true,
+                player,
+                1,
+                &clock,
+                &versioned,
+                test_scenario::ctx(scenario),
+            );
+
+            let current_tick_index = pool::get_pool_current_index(&clmm_pool);
+            assert_eq(i32::as_u32(current_tick_index), 3124);
+
+            let check_rebalance = vault::check_rebalance(
+                &global_config,
+                &mut strategy,
+                vault_id,
+                &mut clmm_pool,
+                test_scenario::ctx(scenario),
+            );
+            let (rebalance,base_lower_index,base_upper_index, base_just_increase,limit_lower_index,limit_upper_index) = vault::get_check_rebalance_info(&check_rebalance);
+            assert_eq(base_lower_index, i32::from(2460));
+            assert_eq(base_upper_index, i32::from(3780));
+            assert_eq(limit_lower_index, i32::from(2880));
+            assert_eq(limit_upper_index, i32::from(3360));
+            assert_eq(rebalance, true);
+            assert_eq(base_just_increase, false);
+
+            vault::rebalance(
+                &operator_cap,
+                &global_config,
+                &mut rewarder_manager,
+                &mut strategy,
+                vault_id,
+                rebalance,
+                base_just_increase,
+                i32::abs_u32(base_lower_index),
+                i32::is_neg(base_lower_index),
+                i32::abs_u32(base_upper_index),
+                i32::is_neg(base_upper_index),
+                i32::abs_u32(limit_lower_index),
+                i32::is_neg(limit_lower_index),
+                i32::abs_u32(limit_upper_index),
+                i32::is_neg(limit_upper_index),
+                &mut clmm_pool,
+                &mut clmm_positions,
+                &clock,
+                &versioned,
+                test_scenario::ctx(scenario),
+
+            );
+
+            // let vault_info = vault::borrow_vault_info(&strategy, vault_id);
+            // std::debug::print(vault_info);
+
+            assert_eq(vault::get_vault_base_last_tick_index(&strategy, vault_id), i32::from(3124));
+            assert_eq(vault::get_vault_limit_last_tick_index(&strategy, vault_id), i32::from(3124));
+            assert_eq(vault::get_vault_base_lower_index(&strategy, vault_id), i32::from(2460));
+            assert_eq(vault::get_vault_base_upper_index(&strategy, vault_id), i32::from(3780));
+            assert_eq(vault::get_vault_limit_lower_index(&strategy, vault_id), i32::from(2880));
+            assert_eq(vault::get_vault_limit_upper_index(&strategy, vault_id), i32::from(3120));
 
             //increase
             vault::deposit(

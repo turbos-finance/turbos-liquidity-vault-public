@@ -53,6 +53,7 @@ module turbos_assets_manage::vault {
     const ENotValidProtocolAsset: u64 = 11;
     const ENotEnoughProtocolAsset: u64 = 12;
     const ETickRangeTooSmall: u64 = 14;
+    const EStrategyLocked: u64 = 15;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -92,6 +93,7 @@ module turbos_assets_manage::vault {
         // The minimum step for the base/limit position, 1 step = 1 tick_spacing.
         base_tick_step_minimum: u32,
         limit_tick_step_minimum: u32,
+        status: u8, //0: normal, 1: lock
     }
 
     struct Vault has store, key {
@@ -305,7 +307,8 @@ module turbos_assets_manage::vault {
             default_base_rebalance_percentage,
             default_limit_rebalance_percentage,
             base_tick_step_minimum,
-            limit_tick_step_minimum
+            limit_tick_step_minimum,
+            status: 0,
         };
 
         let strategy_id = object::id(&strategy);
@@ -374,6 +377,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ): Vault {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
         assert!(base_tick_step >= strategy.base_tick_step_minimum && limit_tick_step >= strategy.limit_tick_step_minimum, ETickRangeTooSmall);
         
         let base_lower_index = i32::from_u32_neg(base_tick_lower_index_u32, base_tick_lower_index_is_neg);
@@ -469,6 +473,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
         let sender = tx_context::sender(ctx);
         let vault_id = object::id(vault);
         let (amount_a, amount_b) = (coin::value(&coin_a), coin::value(&coin_b));
@@ -641,6 +646,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ): (Coin<CoinTypeA>, Coin<CoinTypeB>) {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
         assert!(percentage > 0 && percentage <= 100, EInvalidPercentage);
 
         let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
@@ -774,6 +780,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
 
         let vault_id = object::id(&vault);
         let account = borrow_vault_account(strategy, vault_id);
@@ -809,6 +816,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ): (vector<CheckRebalance>, Option<ID>) {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
 
         let rebalance_vaults = vector::empty();
         let index = 0;
@@ -841,6 +849,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ): CheckRebalance {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
 
         let rebalance = false;
         let vault_info = borrow_vault_info(strategy, vault_id);
@@ -926,6 +935,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_rebalance_manager_role(global_config, operator_address);
         let base_lower_index = i32::from_u32_neg(base_tick_lower_index_u32, base_tick_lower_index_is_neg);
@@ -1246,6 +1256,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ): Coin<BalanceType> {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_vault_manager_role(global_config, operator_address);
 
@@ -1564,7 +1575,7 @@ module turbos_assets_manage::vault {
         };
     }
 
-    public fun update_reward_info(
+    public(friend) fun update_reward_info(
         strategy: &mut Strategy,
         vault_id: ID,
         rewards: VecMap<TypeName, u128>,
@@ -1712,6 +1723,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ): Coin<RewardCoinType> {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
         let vault_id = object::id(vault);
         let reward_type = type_name::get<RewardCoinType>();
         let reward_balance = collect_clmm_reward(
@@ -1753,6 +1765,7 @@ module turbos_assets_manage::vault {
         ctx: &mut TxContext
     ) {
         config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_rebalance_manager_role(global_config, operator_address);
 
@@ -2131,6 +2144,21 @@ module turbos_assets_manage::vault {
         );
     }
 
+    public(friend) fun update_strategy_status(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        status: u8,
+    ): u8 {
+        config::checked_package_version(global_config);
+        let operator_address = object::id_address<OperatorCap>(operator_cap);
+        config::check_vault_manager_role(global_config, operator_address);
+
+        strategy.status = status;
+
+        status
+    }
+
     public(friend) fun update_strategy_image_url(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
@@ -2451,6 +2479,12 @@ module turbos_assets_manage::vault {
         };
 
         (amount_a, amount_b)
+    }
+
+    public fun get_strategy_status(
+        strategy: &Strategy,
+    ): u8 {
+        strategy.status
     }
 
     public fun get_strategy_tick_spacing(
