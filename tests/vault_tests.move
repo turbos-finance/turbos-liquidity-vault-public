@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #[test_only]
-module turbos_clmm::vault_tests {
+module turbos_assets_manage::vault_tests {
     use std::string::{Self, String};
     use sui::test_utils::{assert_eq};
     use sui::coin::{Self, Coin};

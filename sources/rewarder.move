@@ -23,14 +23,14 @@ module turbos_assets_manage::rewarder {
     const EInvalidRewardType: u64 = 1;
     const EStrategyNotRegistered: u64 = 2;
     const EStrategyAlreadyRegistered: u64 = 3;
+    const EStrategyNotInRewarder: u64 = 4;
+    const EStrategyRewardNotEnough: u64 = 5;
 
 
     struct StrategyRewarderInfo has store {
 	    allocate_point: u64,
 	    acc_per_share: u128,
 	    last_reward_time: u64,
-	    reward_released: u128,
-	    reward_harvested: u64
     }
     
     struct Rewarder has store {
@@ -283,6 +283,25 @@ module turbos_assets_manage::rewarder {
         strategy_info.acc_per_share
     }
 
+    public(friend) fun withdraw_reward<T>(
+        manager: &mut RewarderManager, 
+        strategy_id: ID,
+        amount: u64
+    ): Balance<T> {
+        let type_name = type_name::get<T>();
+        assert!(is_strategy_registered(manager, strategy_id), EStrategyNotRegistered);
+        assert!(is_strategy_in_rewarder(manager, type_name, strategy_id), EStrategyNotInRewarder);
+        assert!(bag::contains<TypeName>(&manager.vault, type_name), EInvalidRewardType);
+
+        let balance = bag::borrow_mut<TypeName, Balance<T>>(&mut manager.vault, type_name);
+        assert!(balance::value<T>(balance) >= amount, EStrategyRewardNotEnough);
+
+        let rewarder = linked_table::borrow_mut<TypeName, Rewarder>(&mut manager.rewarders, type_name);
+        rewarder.total_reward_harvested = rewarder.total_reward_harvested + amount;
+
+        balance::split<T>(balance, amount)
+    }
+
 
     public(friend) fun register_strategy(manager: &mut RewarderManager, strategy_id: ID) {
         assert!(!is_strategy_registered(manager, strategy_id), EStrategyAlreadyRegistered);
@@ -317,8 +336,6 @@ module turbos_assets_manage::rewarder {
             allocate_point: allocate_points,
             acc_per_share: 0,
             last_reward_time: current_time,
-            reward_released: 0,
-            reward_harvested: 0,
         };
         linked_table::push_back<ID, StrategyRewarderInfo>(&mut rewarder.strategys, strategy_id, strategy_info);
 

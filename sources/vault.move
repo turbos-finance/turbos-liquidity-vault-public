@@ -34,6 +34,7 @@ module turbos_assets_manage::vault {
 
 
     friend turbos_assets_manage::router;
+    friend turbos_assets_manage::reward_tests;
 
     const FEE_RATE_SCALE: u64 = 1000000;
     const MAX_U64: u64 = 0xffffffffffffffff;
@@ -54,6 +55,7 @@ module turbos_assets_manage::vault {
     const ENotEnoughProtocolAsset: u64 = 12;
     const ETickRangeTooSmall: u64 = 14;
     const EStrategyLocked: u64 = 15;
+    const ENotValidRewarderType: u64 = 16;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -110,7 +112,7 @@ module turbos_assets_manage::vault {
     struct VaultRewardInfo has copy, drop, store {
 	    reward: u128,
 	    reward_debt: u128,
-	    reward_harvested: u64
+	    reward_harvested: u128
     }
 
     struct VaultInfo has copy, drop, store {
@@ -568,43 +570,8 @@ module turbos_assets_manage::vault {
                 merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_a_left));
                 merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b_left));
             }; 
-        } else {
-            let bid_lower_index = limit_lower_index;
-            let bid_upper_index = floor_tick_index(current_tick_index, strategy.tick_spacing, true);
-            let ask_lower_index = floor_tick_index(current_tick_index, strategy.tick_spacing, false);
-            let ask_upper_index = limit_upper_index;
-            let bid_liquidity = calculate_liquidity(sqrt_price, bid_lower_index, bid_upper_index, amount_a, amount_b);
-            let ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a, amount_b);
-            if (bid_liquidity > 0 || ask_liquidity > 0) {
-                let coin_a = coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx);
-                let coin_b = coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx);
-                (limit_lower_index, limit_upper_index) = if (bid_liquidity > ask_liquidity) {
-                    (bid_lower_index, bid_upper_index)
-                } else {
-                    (ask_lower_index, ask_upper_index)
-                };
-
-                let (nft, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
-                    clmm_pool,
-                    clmm_positions,
-                    coin_a,
-                    coin_b,
-                    limit_lower_index,
-                    limit_upper_index,
-                    clock,
-                    clmm_versioned,
-                    ctx,
-                );
-                (limit_lower_index, limit_upper_index , limit_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&nft));
-                limit_clmm_position_id = position_nft::position_id(&nft);
-                fill_clmm_limit_nft(strategy, vault_id, nft);
-                merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_a_left));
-                merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b_left));
-                limit_last_tick_index = current_tick_index;
-            };
-            limit_last_tick_index = current_tick_index;
         };
-
+        
         update_vault_info_with_tick_range(
             strategy,
             vault_id,
@@ -621,7 +588,7 @@ module turbos_assets_manage::vault {
             limit_last_tick_index,
         );
 
-        update_vault_reward_info(
+        update_strategy_reward_info(
             rewarder_manager,
             strategy,
             vault_id,
@@ -708,13 +675,7 @@ module turbos_assets_manage::vault {
                 coin::join(&mut coin_b_out, limit_coin_b);
             };
         };
-        update_vault_info(
-            strategy,
-            vault_id,
-            base_liquidity,
-            limit_liquidity,
-            sqrt_price,
-        );
+       
         let amount_a =  vault_balance_amount<CoinTypeA>(strategy, vault_id);
         let amount_b =  vault_balance_amount<CoinTypeB>(strategy, vault_id);
         let balance_a = take_vault_balance_by_amount<CoinTypeA>(strategy, vault_id, full_math_u64::mul_div_floor(amount_a, percentage, 100));
@@ -738,12 +699,7 @@ module turbos_assets_manage::vault {
 
             (fee_a_amount, fee_b_amount)
         };
-        update_vault_reward_info(
-            rewarder_manager,
-            strategy,
-            vault_id,
-            clock
-        );
+        
         if (burn_clmm_nft && percentage == 100) {
             burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
                 strategy,
@@ -762,6 +718,21 @@ module turbos_assets_manage::vault {
                 );
             }
         };
+
+        update_vault_info(
+            strategy,
+            vault_id,
+            base_liquidity,
+            limit_liquidity,
+            sqrt_price,
+        );
+
+        update_strategy_reward_info(
+            rewarder_manager,
+            strategy,
+            vault_id,
+            clock
+        );
 
         let vault_info = borrow_vault_info(strategy, vault_id);
         event::emit(WithdrawEvent {
@@ -1185,7 +1156,7 @@ module turbos_assets_manage::vault {
             limit_last_tick_index,
         );
 
-        update_vault_reward_info(
+        update_strategy_reward_info(
             rewarder_manager,
             strategy,
             vault_id,
@@ -1279,6 +1250,7 @@ module turbos_assets_manage::vault {
     ) {
         let tick_spacing_i32 = i32::from_u32(tick_spacing);
         assert!(i32::lt(lower_index, current_index) && i32::lt(current_index, upper_index), EInvalidTickRange);
+        
         let (minimum_lower_index, minimum_upper_index) = calculate_tick_index(
             current_index,
             tick_spacing,
@@ -1433,17 +1405,13 @@ module turbos_assets_manage::vault {
         (coin_a, coin_b)
     }
 
-    fun update_vault_reward_info(
+    fun update_strategy_reward_info(
         rewarder_manager: &mut RewarderManager,
         strategy: &mut Strategy,
         vault_id: ID,
         clock: &Clock,
     ): u128 {
         let new_share = 0;
-        //If the vault_id is in the reward blacklist, it will not participate in the reward.
-        if (rewarder::is_in_black_list(rewarder_manager, object::id_to_address(&vault_id))) {
-            return new_share
-        };
         let strategy_id = object::id(strategy);
         let (
             base_lower_index,
@@ -1456,28 +1424,31 @@ module turbos_assets_manage::vault {
             old_share,
             rewards,
         ) = get_vault_info(strategy, vault_id);
-        if (is_clmm_base_nft_exists(strategy, vault_id)) {
-            let share = calculate_position_share(
-                base_lower_index, 
-                base_upper_index, 
-                base_liquidity, 
-                sqrt_price, 
-                strategy.effective_tick_lower, 
-                strategy.effective_tick_upper,
-            );
-            new_share = new_share + share;
-        };
-        
-        if (is_clmm_limit_nft_exists(strategy, vault_id)) {
-            let share = calculate_position_share(
-                limit_lower_index, 
-                limit_upper_index, 
-                limit_liquidity, 
-                sqrt_price, 
-                strategy.effective_tick_lower, 
-                strategy.effective_tick_upper,
-            );
-            new_share = new_share + share;
+        //If the vault_id is in the reward blacklist, it will not participate in the reward.
+        if (!rewarder::is_in_black_list(rewarder_manager, object::id_to_address(&vault_id))) {
+            if (is_clmm_base_nft_exists(strategy, vault_id)) {
+                let share = calculate_position_share(
+                    base_lower_index, 
+                    base_upper_index, 
+                    base_liquidity, 
+                    sqrt_price, 
+                    strategy.effective_tick_lower, 
+                    strategy.effective_tick_upper,
+                );
+                new_share = new_share + share;
+            };
+
+            if (is_clmm_limit_nft_exists(strategy, vault_id)) {
+                let share = calculate_position_share(
+                    limit_lower_index, 
+                    limit_upper_index, 
+                    limit_liquidity, 
+                    sqrt_price, 
+                    strategy.effective_tick_lower, 
+                    strategy.effective_tick_upper,
+                );
+                new_share = new_share + share;
+            };
         };
         
         let total_share = strategy.total_share;
@@ -1485,17 +1456,17 @@ module turbos_assets_manage::vault {
         
         // get new acc_per_share of strategy
         let rewards_settled = rewarder::strategy_rewards_settle(
-            rewarder_manager, 
-            vec_map::keys(&rewards), 
+            rewarder_manager,
+            strategy.rewarders,
             strategy_id, 
             clock,
         );
 
-        update_reward_info(
+        update_vault_reward_info(
             strategy,
             vault_id,
             rewards_settled, 
-            new_total_share,
+            new_share,
         );
         
         strategy.total_share = new_total_share;
@@ -1545,8 +1516,10 @@ module turbos_assets_manage::vault {
             liquidity
         );
 
-        let share = full_math_u128::mul_shr(amount0, sqrt_price, 128) + amount1;
-        share
+        let price = (sqrt_price as u256) * (sqrt_price as u256) * 1000000000 / 0xffffffffffffffffffffffffffffffffu256;
+        let amount_0_in_quote_token = ((amount0 as u256) * price / 1000000000 as u128);
+        
+        (amount_0_in_quote_token + amount1)
     }
 
 
@@ -1583,7 +1556,22 @@ module turbos_assets_manage::vault {
         };
     }
 
-    public(friend) fun update_reward_info(
+    fun update_vault_reward_info_on_claim(
+        strategy: &mut Strategy,
+        vault_id: ID,
+        rewarder_type: TypeName,
+    ): u64 {
+        let vault_info = borrow_mut_vault_info(strategy, vault_id);
+        let reward_info = vec_map::get_mut(&mut vault_info.rewards, &rewarder_type);
+        let claimed_reward = reward_info.reward;
+        reward_info.reward = 0;
+        reward_info.reward_harvested = reward_info.reward_harvested + claimed_reward;
+
+        (claimed_reward as u64)
+    }
+
+    // pending reward = (new_share * strategy.acc_per_share) - vault_info.reward_debt
+    fun update_vault_reward_info(
         strategy: &mut Strategy,
         vault_id: ID,
         rewards: VecMap<TypeName, u128>,
@@ -1595,21 +1583,21 @@ module turbos_assets_manage::vault {
 
         while (index < size) {
             let (reward_type, acc_per_share) = vec_map::get_entry_by_idx(&rewards, index);
-            let reward_scaled_for_new_share = (full_math_u128::full_mul(*acc_per_share, new_share) as u128);
+            let new_reward_share = (full_math_u128::full_mul(*acc_per_share, new_share) as u128);
             // reward of vault
-            let reward_scaled_for_existing_share = (full_math_u128::full_mul(*acc_per_share, vault_info.share) as u128);
+            let reward_debt = (full_math_u128::full_mul(*acc_per_share, vault_info.share) as u128);
 
             if (!vec_map::contains<TypeName, VaultRewardInfo>(&vault_info.rewards, reward_type)) {
                 let vault_reward_info = VaultRewardInfo {
-                    reward: reward_scaled_for_existing_share,
-                    reward_debt: reward_scaled_for_new_share,
+                    reward: 0,
+                    reward_debt: new_reward_share,
                     reward_harvested: 0,
                 };
                 vec_map::insert(&mut vault_info.rewards, *reward_type, vault_reward_info);
             } else {
                 let reward_info = vec_map::get_mut(&mut vault_info.rewards, reward_type);
-                reward_info.reward = reward_info.reward + reward_scaled_for_existing_share - reward_info.reward_debt;
-                reward_info.reward_debt = reward_scaled_for_new_share;
+                reward_info.reward = reward_info.reward + new_reward_share - reward_info.reward_debt;
+                reward_info.reward_debt = new_reward_share;
             };
 
             index = index + 1;
@@ -1715,6 +1703,52 @@ module turbos_assets_manage::vault {
         let asset_name = string::from_ascii(type_name::into_string(type_name));
 
         asset_name
+    }
+
+    public fun collect_reward<RewardCoinType>(
+        global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
+        strategy: &mut Strategy,
+        vault: &Vault,
+        clock: &Clock,
+        clmm_versioned: &Versioned,
+        ctx: &mut TxContext
+    ): Coin<RewardCoinType> {
+        config::checked_package_version(global_config);
+        assert!(strategy.status == 0, EStrategyLocked);
+
+        let rewarder_type_name = type_name::get<RewardCoinType>();
+        assert!(vector::contains<TypeName>(&strategy.rewarders, &rewarder_type_name), ENotValidRewarderType);
+        let strategy_id = object::id(strategy);
+        let vault_id = object::id(vault);
+        
+        let rewards_settled = rewarder::strategy_rewards_settle(
+            rewarder_manager,
+            strategy.rewarders,
+            strategy_id, 
+            clock,
+        );
+
+        let vault_info = borrow_vault_info(strategy, vault_id);
+        update_vault_reward_info(
+            strategy,
+            vault_id,
+            rewards_settled, 
+            vault_info.share,
+        );
+
+        let amount = update_vault_reward_info_on_claim(
+            strategy,
+            vault_id,
+            rewarder_type_name
+        );
+
+        let balance = rewarder::withdraw_reward(
+            rewarder_manager,
+            strategy_id,
+            amount
+        );
+         coin::from_balance(balance, ctx)
     }
 
     public fun collect_clmm_reward_direct_return<CoinTypeA, CoinTypeB, FeeType, RewardCoinType>(
@@ -2440,6 +2474,14 @@ module turbos_assets_manage::vault {
         vault_info.sqrt_price
     }
 
+    public fun  get_vault_share(
+        strategy: &Strategy,
+        vault_id: ID,
+    ): u128 {
+        let vault_info = linked_table::borrow(&strategy.vaults, vault_id);
+        vault_info.share
+    }
+
     public fun get_vault_balance<BalanceType>(
         strategy: &Strategy,
         vault_id: ID,
@@ -2493,6 +2535,12 @@ module turbos_assets_manage::vault {
         strategy: &Strategy,
     ): u8 {
         strategy.status
+    }
+
+    public fun get_strategy_total_share(
+        strategy: &Strategy,
+    ): u128 {
+        strategy.total_share
     }
 
     public fun get_strategy_tick_spacing(
