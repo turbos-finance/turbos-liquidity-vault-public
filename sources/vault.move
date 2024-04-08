@@ -34,7 +34,6 @@ module turbos_assets_manage::vault {
 
 
     friend turbos_assets_manage::router;
-    friend turbos_assets_manage::reward_tests;
 
     const FEE_RATE_SCALE: u64 = 1000000;
     const MAX_U64: u64 = 0xffffffffffffffff;
@@ -269,7 +268,7 @@ module turbos_assets_manage::vault {
         transfer::public_transfer(display, tx_context::sender(ctx));
     }
 
-    public(friend) fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
+    public fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
