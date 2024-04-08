@@ -11,6 +11,7 @@ module turbos_assets_manage::rewarder {
     use sui::table::{Self, Table};
     use sui::linked_table::{Self, LinkedTable};
     use sui::bag::{Self, Bag};
+    use sui::coin::{Self, Coin};
     use sui::event;
     use turbos_assets_manage::config::{Self, GlobalConfig, OperatorCap};
     use sui::balance::{Self, Balance};
@@ -20,11 +21,13 @@ module turbos_assets_manage::rewarder {
 
     friend turbos_assets_manage::vault;
 
+    const REWARD_SCALE_FACTOR: u128 = 1000000000;
+
     const EInvalidRewardType: u64 = 1;
     const EStrategyNotRegistered: u64 = 2;
     const EStrategyAlreadyRegistered: u64 = 3;
     const EStrategyNotInRewarder: u64 = 4;
-    const EStrategyRewardNotEnough: u64 = 5;
+    const ERewardNotEnough: u64 = 5;
 
 
     struct StrategyRewarderInfo has store {
@@ -36,7 +39,7 @@ module turbos_assets_manage::rewarder {
     struct Rewarder has store {
 	    reward_coin: TypeName,
 	    total_allocate_point: u64,
-	    emission_per_second: u128,
+	    emission_per_second: u64,
 	    last_reward_time: u64,
 	    total_reward_released: u128,
 	    total_reward_harvested: u64,
@@ -58,12 +61,12 @@ module turbos_assets_manage::rewarder {
 
     struct CreateRewarderEvent has copy, drop {
         reward_coin: TypeName,
-        emission_per_second: u128
+        emission_per_second: u64
     }
 
     struct UpdateRewarderEvent has copy, drop {
         reward_coin: TypeName,
-        emission_per_second: u128
+        emission_per_second: u64
     }
 
     struct DepositEvent has copy, drop {
@@ -97,7 +100,8 @@ module turbos_assets_manage::rewarder {
     public fun deposit_rewarder<T>(
         config: &GlobalConfig, 
         manager: &mut RewarderManager, 
-        balance: Balance<T>
+        coin: Coin<T>,
+        ctx: &mut TxContext
     ) {
         config::checked_package_version(config);
 
@@ -107,8 +111,8 @@ module turbos_assets_manage::rewarder {
             bag::add<TypeName, Balance<T>>(&mut manager.vault, type_name, zero_balance);
         };
 
-        let before_amount = balance::value<T>(&balance);
-        let after_amount = balance::join<T>(bag::borrow_mut<TypeName, Balance<T>>(&mut manager.vault, type_name), balance);
+        let before_amount = coin::value<T>(&coin);
+        let after_amount = balance::join<T>(bag::borrow_mut<TypeName, Balance<T>>(&mut manager.vault, type_name), coin::into_balance(coin));
 
         let deposit_event = DepositEvent {
             reward_type: type_name,
@@ -122,7 +126,7 @@ module turbos_assets_manage::rewarder {
         operator_cap: &OperatorCap, 
         config: &GlobalConfig, 
         manager: &mut RewarderManager, 
-        emission_per_second: u128, 
+        emission_per_second: u64, 
         clock: &Clock, 
         ctx: &mut TxContext
     ) {
@@ -162,7 +166,7 @@ module turbos_assets_manage::rewarder {
         operator_cap: &OperatorCap, 
         config: &GlobalConfig, 
         manager: &mut RewarderManager, 
-        new_emission_per_second: u128, 
+        new_emission_per_second: u64, 
         clock: &Clock
     ) {
         config::checked_package_version(config);
@@ -228,8 +232,8 @@ module turbos_assets_manage::rewarder {
         if (rewarder.last_reward_time <= current_time) {
             let elapsed_time = current_time - rewarder.last_reward_time;
             if (rewarder.emission_per_second > 0) {
-                let additional_rewards = rewarder.emission_per_second * (elapsed_time as u128);
-                rewarder.total_reward_released = rewarder.total_reward_released + additional_rewards;
+                let additional_rewards = rewarder.emission_per_second * elapsed_time;
+                rewarder.total_reward_released = rewarder.total_reward_released + (additional_rewards as u128);
             };
             rewarder.last_reward_time = current_time;
         }
@@ -266,18 +270,11 @@ module turbos_assets_manage::rewarder {
 
         if (current_time > strategy_info.last_reward_time && rewarder.emission_per_second > 0) {
             let elapsed_time = current_time - strategy_info.last_reward_time;
-
-            //Total reward for all strategies
-            let new_rewards = rewarder.emission_per_second * (elapsed_time as u128);
-
-            let reward_per_share = new_rewards * strategy_share / (rewarder.total_allocate_point as u128);
-
-            strategy_info.acc_per_share = strategy_info.acc_per_share + reward_per_share;
-
+            let new_rewards_total = rewarder.emission_per_second * elapsed_time;
+            let new_rewards_strategy = new_rewards_total * strategy_info.allocate_point / rewarder.total_allocate_point;
+            strategy_info.acc_per_share = strategy_info.acc_per_share + full_math_u128::mul_div_floor((new_rewards_strategy as u128), REWARD_SCALE_FACTOR, strategy_share);
             strategy_info.last_reward_time = current_time;
-
-            rewarder.total_reward_released = rewarder.total_reward_released + new_rewards;
-
+            rewarder.total_reward_released = rewarder.total_reward_released + (new_rewards_total as u128);
         };
 
         strategy_info.acc_per_share
@@ -294,7 +291,7 @@ module turbos_assets_manage::rewarder {
         assert!(bag::contains<TypeName>(&manager.vault, type_name), EInvalidRewardType);
 
         let balance = bag::borrow_mut<TypeName, Balance<T>>(&mut manager.vault, type_name);
-        assert!(balance::value<T>(balance) >= amount, EStrategyRewardNotEnough);
+        assert!(balance::value<T>(balance) >= amount, ERewardNotEnough);
 
         let rewarder = linked_table::borrow_mut<TypeName, Rewarder>(&mut manager.rewarders, type_name);
         rewarder.total_reward_harvested = rewarder.total_reward_harvested + amount;

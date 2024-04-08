@@ -39,6 +39,8 @@ module turbos_assets_manage::vault {
     const FEE_RATE_SCALE: u64 = 1000000;
     const MAX_U64: u64 = 0xffffffffffffffff;
     const CLMM_DEADLINE_MS: u64 = 60000;
+    const REWARD_SCALE_FACTOR: u128 = 1000000000;
+
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
     const EInvalidAmount: u64 = 1;
@@ -137,7 +139,6 @@ module turbos_assets_manage::vault {
         limit_tick_step: u32,
         share: u128,
         rewards: VecMap<TypeName, VaultRewardInfo>,
-        earn_stats: VecMap<String, u128>,
     }
 
     struct CheckRebalance has copy, drop {
@@ -217,6 +218,13 @@ module turbos_assets_manage::vault {
         strategy_id: ID,
         clmm_pool_id: ID,
         clmm_nft_id: ID,
+        amount: u64,
+        reward_type_name: TypeName,
+    }
+
+    struct VaultRewardClaimedEvent has copy, drop {
+        vault_id: ID,
+        strategy_id: ID,
         amount: u64,
         reward_type_name: TypeName,
     }
@@ -447,7 +455,6 @@ module turbos_assets_manage::vault {
             limit_tick_step,
             share: 0,
             rewards: vec_map::empty<TypeName, VaultRewardInfo>(),
-            earn_stats: vec_map::empty<String, u128>(),
         };
         linked_table::push_back<ID, VaultInfo>(&mut strategy.vaults, vault_id, vault_info);
         strategy.vault_index = new_vault_index;
@@ -1583,10 +1590,9 @@ module turbos_assets_manage::vault {
 
         while (index < size) {
             let (reward_type, acc_per_share) = vec_map::get_entry_by_idx(&rewards, index);
-            let new_reward_share = (full_math_u128::full_mul(*acc_per_share, new_share) as u128);
+            let new_reward_share = full_math_u128::mul_div_floor(*acc_per_share, new_share, REWARD_SCALE_FACTOR);
             // reward of vault
-            let reward_debt = (full_math_u128::full_mul(*acc_per_share, vault_info.share) as u128);
-
+            let reward_debt = full_math_u128::mul_div_floor(*acc_per_share, vault_info.share, REWARD_SCALE_FACTOR);
             if (!vec_map::contains<TypeName, VaultRewardInfo>(&vault_info.rewards, reward_type)) {
                 let vault_reward_info = VaultRewardInfo {
                     reward: 0,
@@ -1711,7 +1717,6 @@ module turbos_assets_manage::vault {
         strategy: &mut Strategy,
         vault: &Vault,
         clock: &Clock,
-        clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ): Coin<RewardCoinType> {
         config::checked_package_version(global_config);
@@ -1748,7 +1753,14 @@ module turbos_assets_manage::vault {
             strategy_id,
             amount
         );
-         coin::from_balance(balance, ctx)
+
+        event::emit(VaultRewardClaimedEvent {
+            vault_id,
+            strategy_id,
+            amount,
+            reward_type_name: rewarder_type_name,
+        });
+        coin::from_balance(balance, ctx)
     }
 
     public fun collect_clmm_reward_direct_return<CoinTypeA, CoinTypeB, FeeType, RewardCoinType>(
@@ -1906,7 +1918,6 @@ module turbos_assets_manage::vault {
             ctx,
         );
         let amount = coin::value(&reward_coin);
-        update_earn_stats<RewardCoin>(strategy, vault_id, amount);
 
         event::emit(ClmmRewardClaimedEvent {
             vault_id,
@@ -1951,7 +1962,6 @@ module turbos_assets_manage::vault {
             ctx,
         );
         let amount = coin::value(&reward_coin);
-        update_earn_stats<RewardCoin>(strategy, vault_id, amount);
 
          event::emit(ClmmRewardClaimedEvent {
             vault_id,
@@ -1996,8 +2006,6 @@ module turbos_assets_manage::vault {
         let amount_b = coin::value<CoinTypeB>(&coin_b);
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b));
-        update_earn_stats<CoinTypeA>(strategy, vault_id, amount_a);
-        update_earn_stats<CoinTypeB>(strategy, vault_id, amount_b);
 
         event::emit(ClmmFeeClaimedEvent {
             vault_id,
@@ -2042,8 +2050,6 @@ module turbos_assets_manage::vault {
         let amount_b = coin::value<CoinTypeB>(&coin_b);
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b));
-        update_earn_stats<CoinTypeA>(strategy, vault_id, amount_a);
-        update_earn_stats<CoinTypeB>(strategy, vault_id, amount_b);
 
         event::emit(ClmmFeeClaimedEvent {
             vault_id,
@@ -2055,21 +2061,6 @@ module turbos_assets_manage::vault {
             coin_a_type_name: type_name::get<CoinTypeA>(),
             coin_b_type_name: type_name::get<CoinTypeB>(),
         })
-    }
-
-    fun update_earn_stats<T>(
-        strategy: &mut Strategy,
-        vault_id: ID,
-        amount: u64,
-    ) {
-        let type_name = get_type_name_str<T>();
-        let vault_info = borrow_mut_vault_info(strategy, vault_id);
-        if (vec_map::contains(&vault_info.earn_stats, &type_name)) {
-            let vaule = vec_map::get_mut(&mut vault_info.earn_stats, &type_name);
-            *vaule = *vaule + (amount as u128);
-        } else {
-            vec_map::insert(&mut vault_info.earn_stats, type_name, (amount as u128));
-        }
     }
 
     public fun is_clmm_base_nft_exists(

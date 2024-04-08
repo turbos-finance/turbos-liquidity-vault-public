@@ -317,6 +317,27 @@ module turbos_assets_manage::router {
         transfer::public_transfer(reward, recipient);
     }
 
+    entry public fun collect_reward<RewardCoinType>(
+        global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
+        strategy: &mut Strategy,
+        vault: &Vault,
+        recipient: address,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let reward = vault::collect_reward<RewardCoinType>(
+            global_config,
+            rewarder_manager,
+            strategy,
+            vault,
+            clock,
+            ctx
+        );
+
+        transfer::public_transfer(reward, recipient);
+    }
+
     entry public fun collect_protocol_fee<BalanceType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,

@@ -28,7 +28,7 @@ module turbos_assets_manage::reward_tests {
     use turbos_assets_manage::config::{Self, AdminCap, GlobalConfig, OperatorCap};
     use turbos_assets_manage::router;
     use turbos_assets_manage::rewarder::{Self, RewarderManager};
-    use sui::clock::{Clock};
+    use sui::clock::{Self, Clock};
     use sui::transfer;
 
     const MAX_SQRT_PRICE_X64: u128 = 79226673515401279992447579055;
@@ -217,6 +217,7 @@ module turbos_assets_manage::reward_tests {
             
             let btc = test_scenario::take_from_sender<Coin<BTC>>(scenario);
             let usdc = test_scenario::take_from_sender<Coin<USDC>>(scenario); 
+            let eth = test_scenario::take_from_sender<Coin<ETH>>(scenario); 
 
             let current_tick_index = pool::get_pool_current_index(&clmm_pool);
             let tick_spacing = pool::get_pool_tick_spacing(&clmm_pool);
@@ -235,6 +236,13 @@ module turbos_assets_manage::reward_tests {
                 test_scenario::ctx(scenario),
             );
 
+            //deposit rewarder 
+            rewarder::deposit_rewarder<ETH>(
+                &global_config,
+                &mut rewarder_manager,
+                coin::split(&mut eth, 10000, test_scenario::ctx(scenario)),
+                test_scenario::ctx(scenario),
+            );
 
             //strategy one
             let strategy_one = vault::create_strategy(
@@ -435,6 +443,69 @@ module turbos_assets_manage::reward_tests {
             let strategy_two_total_share = vault::get_strategy_total_share(&strategy_two);
             assert_eq(strategy_two_total_share, 39998);
 
+            //forward 10s to emissions
+            clock::increment_for_testing(&mut clock, 10000); //10s
+            let reward_one = vault::collect_reward<ETH>(
+                &global_config,
+                &mut rewarder_manager,
+                &mut strategy_one,
+                &strategy_one_vault_one,
+                &clock,
+                test_scenario::ctx(scenario),
+            );
+            let amount = coin::value(&reward_one);
+            assert_eq(amount, 249);
+            coin::join(&mut eth, reward_one);
+
+            let reward_two = vault::collect_reward<ETH>(
+                &global_config,
+                &mut rewarder_manager,
+                &mut strategy_one,
+                &strategy_one_vault_two,
+                &clock,
+                test_scenario::ctx(scenario),
+            );
+            amount = coin::value(&reward_two);
+            assert_eq(amount, 249);
+            coin::join(&mut eth, reward_two);
+
+            let reward_three = vault::collect_reward<ETH>(
+                &global_config,
+                &mut rewarder_manager,
+                &mut strategy_two,
+                &strategy_two_vault_one,
+                &clock,
+                test_scenario::ctx(scenario),
+            );
+            amount = coin::value(&reward_three);
+            assert_eq(amount, 499);
+            coin::join(&mut eth, reward_three);
+
+            clock::increment_for_testing(&mut clock, 20000); //20s
+            let reward_one = vault::collect_reward<ETH>(
+                &global_config,
+                &mut rewarder_manager,
+                &mut strategy_one,
+                &strategy_one_vault_one,
+                &clock,
+                test_scenario::ctx(scenario),
+            );
+            let amount = coin::value(&reward_one);
+            assert_eq(amount, 500);
+            coin::join(&mut eth, reward_one);
+
+            let reward_three = vault::collect_reward<ETH>(
+                &global_config,
+                &mut rewarder_manager,
+                &mut strategy_two,
+                &strategy_two_vault_one,
+                &clock,
+                test_scenario::ctx(scenario),
+            );
+            amount = coin::value(&reward_three);
+            assert_eq(amount, 1000);
+            coin::join(&mut eth, reward_three);
+
             transfer::public_share_object(strategy_one);
             transfer::public_share_object(strategy_two);
             transfer::public_transfer(strategy_one_vault_one, player);
@@ -442,6 +513,7 @@ module turbos_assets_manage::reward_tests {
             transfer::public_transfer(strategy_two_vault_one, player);
             test_scenario::return_to_sender(scenario, btc);
             test_scenario::return_to_sender(scenario, usdc);
+            test_scenario::return_to_sender(scenario, eth);
             test_scenario::return_shared(global_config);
             test_scenario::return_to_sender(scenario, operator_cap);
             test_scenario::return_shared(clmm_pool);
