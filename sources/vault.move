@@ -1591,7 +1591,7 @@ module turbos_assets_manage::vault {
             let (reward_type, acc_per_share) = vec_map::get_entry_by_idx(&rewards, index);
             let new_reward_share = full_math_u128::mul_div_floor(*acc_per_share, new_share, REWARD_SCALE_FACTOR);
             // reward of vault
-            let reward_debt = full_math_u128::mul_div_floor(*acc_per_share, vault_info.share, REWARD_SCALE_FACTOR);
+            let old_reward_share = full_math_u128::mul_div_floor(*acc_per_share, vault_info.share, REWARD_SCALE_FACTOR);
             if (!vec_map::contains<TypeName, VaultRewardInfo>(&vault_info.rewards, reward_type)) {
                 let vault_reward_info = VaultRewardInfo {
                     reward: 0,
@@ -1601,7 +1601,7 @@ module turbos_assets_manage::vault {
                 vec_map::insert(&mut vault_info.rewards, *reward_type, vault_reward_info);
             } else {
                 let reward_info = vec_map::get_mut(&mut vault_info.rewards, reward_type);
-                reward_info.reward = reward_info.reward + new_reward_share - reward_info.reward_debt;
+                reward_info.reward = reward_info.reward + old_reward_share - reward_info.reward_debt;
                 reward_info.reward_debt = new_reward_share;
             };
 
