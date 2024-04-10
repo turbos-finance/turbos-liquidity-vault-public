@@ -57,6 +57,7 @@ module turbos_assets_manage::vault {
     const ETickRangeTooSmall: u64 = 14;
     const EStrategyLocked: u64 = 15;
     const ENotValidRewarderType: u64 = 16;
+    const ENotTheCorrespondingStrategy: u64 = 17;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -387,6 +388,7 @@ module turbos_assets_manage::vault {
     ): Vault {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
+        assert!(strategy.clmm_pool_id == object::id(clmm_pool), ENotTheCorrespondingStrategy);
         assert!(base_tick_step >= strategy.base_tick_step_minimum && limit_tick_step >= strategy.limit_tick_step_minimum, ETickRangeTooSmall);
         
         let base_lower_index = i32::from_u32_neg(base_tick_lower_index_u32, base_tick_lower_index_is_neg);
@@ -482,6 +484,7 @@ module turbos_assets_manage::vault {
     ) {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
+        assert!(strategy.clmm_pool_id == object::id(clmm_pool), ENotTheCorrespondingStrategy);
         let sender = tx_context::sender(ctx);
         let vault_id = object::id(vault);
         let (amount_a_deposit, amount_b_deposit) = (coin::value(&coin_a), coin::value(&coin_b));
@@ -627,6 +630,7 @@ module turbos_assets_manage::vault {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
         assert!(percentage > 0 && percentage <= 100, EInvalidPercentage);
+        assert!(strategy.clmm_pool_id == object::id(clmm_pool), ENotTheCorrespondingStrategy);
 
         let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
         let vault_id = object::id(vault);
@@ -1777,6 +1781,7 @@ module turbos_assets_manage::vault {
     ): Coin<RewardCoinType> {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
+        assert!(strategy.clmm_pool_id == object::id(clmm_pool), ENotTheCorrespondingStrategy);
         let vault_id = object::id(vault);
         let reward_type = type_name::get<RewardCoinType>();
         let reward_balance = collect_clmm_reward(
@@ -1819,6 +1824,7 @@ module turbos_assets_manage::vault {
     ) {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
+        assert!(strategy.clmm_pool_id == object::id(clmm_pool), ENotTheCorrespondingStrategy);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_rebalance_manager_role(global_config, operator_address);
 
