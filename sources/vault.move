@@ -36,9 +36,11 @@ module turbos_assets_manage::vault {
     friend turbos_assets_manage::router;
 
     const FEE_RATE_SCALE: u64 = 1000000;
+    const WITHDRAW_PERCENTAGE_SCALE: u64 = 1000000;
     const MAX_U64: u64 = 0xffffffffffffffff;
     const CLMM_DEADLINE_MS: u64 = 60000;
     const REWARD_SCALE_FACTOR: u128 = 1000000000;
+    const SHARE_SCALE_FACTOR: u256 = 1000000000;
 
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
@@ -621,7 +623,7 @@ module turbos_assets_manage::vault {
         vault: &mut Vault,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
-        percentage: u64, //0~100
+        percentage: u64, //mul WITHDRAW_PERCENTAGE_SCALE
         burn_clmm_nft: bool,
         clock: &Clock,
         clmm_versioned: &Versioned,
@@ -629,7 +631,7 @@ module turbos_assets_manage::vault {
     ): (Coin<CoinTypeA>, Coin<CoinTypeB>) {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
-        assert!(percentage > 0 && percentage <= 100, EInvalidPercentage);
+        assert!(percentage > 0 && percentage <= WITHDRAW_PERCENTAGE_SCALE, EInvalidPercentage);
         assert!(strategy.clmm_pool_id == object::id(clmm_pool), ENotTheCorrespondingStrategy);
 
         let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
@@ -653,7 +655,7 @@ module turbos_assets_manage::vault {
                 nft,
                 clmm_pool,
                 clmm_positions,
-                full_math_u128::mul_div_floor(liquidity, (percentage as u128), 100),
+                full_math_u128::mul_div_floor(liquidity, (percentage as u128), (WITHDRAW_PERCENTAGE_SCALE as u128)),
                 clock,
                 clmm_versioned,
                 ctx,
@@ -674,7 +676,7 @@ module turbos_assets_manage::vault {
                     limit_nft,
                     clmm_pool,
                     clmm_positions,
-                    full_math_u128::mul_div_floor(liquidity, (percentage as u128), 100),
+                    full_math_u128::mul_div_floor(liquidity, (percentage as u128), (WITHDRAW_PERCENTAGE_SCALE as u128)),
                     clock,
                     clmm_versioned,
                     ctx,
@@ -688,8 +690,8 @@ module turbos_assets_manage::vault {
        
         let amount_a =  vault_balance_amount<CoinTypeA>(strategy, vault_id);
         let amount_b =  vault_balance_amount<CoinTypeB>(strategy, vault_id);
-        let balance_a = take_vault_balance_by_amount<CoinTypeA>(strategy, vault_id, full_math_u64::mul_div_floor(amount_a, percentage, 100));
-        let balance_b = take_vault_balance_by_amount<CoinTypeB>(strategy, vault_id, full_math_u64::mul_div_floor(amount_b, percentage, 100));
+        let balance_a = take_vault_balance_by_amount<CoinTypeA>(strategy, vault_id, full_math_u64::mul_div_floor(amount_a, percentage, WITHDRAW_PERCENTAGE_SCALE));
+        let balance_b = take_vault_balance_by_amount<CoinTypeB>(strategy, vault_id, full_math_u64::mul_div_floor(amount_b, percentage, WITHDRAW_PERCENTAGE_SCALE));
         coin::join(&mut coin_a_out, coin::from_balance(balance_a, ctx));
         coin::join(&mut coin_b_out, coin::from_balance(balance_b, ctx));
         
@@ -710,7 +712,7 @@ module turbos_assets_manage::vault {
             (fee_a_amount, fee_b_amount)
         };
         
-        if (burn_clmm_nft && percentage == 100) {
+        if (burn_clmm_nft && percentage == WITHDRAW_PERCENTAGE_SCALE) {
             burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
                 strategy,
                 vault_id,
@@ -1526,8 +1528,8 @@ module turbos_assets_manage::vault {
             liquidity
         );
 
-        let price = (sqrt_price as u256) * (sqrt_price as u256) * 1000000000 / 0xffffffffffffffffffffffffffffffffu256;
-        let amount_0_in_quote_token = ((amount0 as u256) * price / 1000000000 as u128);
+        let price = (sqrt_price as u256) * (sqrt_price as u256) * SHARE_SCALE_FACTOR / 0xffffffffffffffffffffffffffffffffu256;
+        let amount_0_in_quote_token = ((amount0 as u256) * price / SHARE_SCALE_FACTOR as u128);
         
         (amount_0_in_quote_token + amount1)
     }
