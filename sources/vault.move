@@ -645,27 +645,30 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
-        let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
-        let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
-        let base_liquidity = 0;
         let coin_a_out = coin::zero<CoinTypeA>(ctx);
         let coin_b_out = coin::zero<CoinTypeB>(ctx);
-        if (liquidity > 0) {
-            let (base_coin_a, base_coin_b) = decrease_clmm_liquidity(
-                nft,
-                clmm_pool,
-                clmm_positions,
-                full_math_u128::mul_div_floor(liquidity, (percentage as u128), (WITHDRAW_PERCENTAGE_SCALE as u128)),
-                clock,
-                clmm_versioned,
-                ctx,
-            );
-            let (base_lower_index, base_upper_index, base_liquidity_new) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
-            base_liquidity = base_liquidity_new;
-            coin::join(&mut coin_a_out, base_coin_a);
-            coin::join(&mut coin_b_out, base_coin_b);
+        let base_liquidity = 0;
+        let is_clmm_base_nft_exists = is_clmm_base_nft_exists(strategy, vault_id);
+        if (is_clmm_base_nft_exists) {
+            let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
+            let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
+            if (liquidity > 0) {
+                let (base_coin_a, base_coin_b) = decrease_clmm_liquidity(
+                    nft,
+                    clmm_pool,
+                    clmm_positions,
+                    full_math_u128::mul_div_floor(liquidity, (percentage as u128), (WITHDRAW_PERCENTAGE_SCALE as u128)),
+                    clock,
+                    clmm_versioned,
+                    ctx,
+                );
+                let (base_lower_index, base_upper_index, base_liquidity_new) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
+                base_liquidity = base_liquidity_new;
+                coin::join(&mut coin_a_out, base_coin_a);
+                coin::join(&mut coin_b_out, base_coin_b);
+            };
         };
-
+        
         let limit_liquidity = 0;
         let is_clmm_limit_nft_exists = is_clmm_limit_nft_exists(strategy, vault_id);
         if (is_clmm_limit_nft_exists) {
@@ -713,13 +716,15 @@ module turbos_assets_manage::vault {
         };
         
         if (burn_clmm_nft && percentage == WITHDRAW_PERCENTAGE_SCALE) {
-            burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
-                strategy,
-                vault_id,
-                clmm_positions,
-                clmm_versioned,
-                ctx
-            );
+            if (is_clmm_base_nft_exists) {
+                burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
+                    strategy,
+                    vault_id,
+                    clmm_positions,
+                    clmm_versioned,
+                    ctx
+                );
+            };
             if (is_clmm_limit_nft_exists) {
                 burn_clmm_limit_nft<CoinTypeA, CoinTypeB, FeeType>(
                     strategy,
@@ -808,10 +813,10 @@ module turbos_assets_manage::vault {
         assert!(strategy.status == 0, EStrategyLocked);
 
         let rebalance_vaults = vector::empty();
-        let index = 0;
+        let rebalance_vaults_lenght = 0;
         let last_vault_id;
         let vault_id_option = &option::some(current_vault_id);
-        while(!option::is_none(vault_id_option) && index < limit) {
+        while(!option::is_none(vault_id_option) && rebalance_vaults_lenght < limit) {
             let vault_id = *option::borrow(vault_id_option);
             let checkRebalance = check_rebalance(
                 global_config,
@@ -822,10 +827,10 @@ module turbos_assets_manage::vault {
             );
             if (checkRebalance.rebalance) {
                 vector::push_back(&mut rebalance_vaults, checkRebalance);
+                rebalance_vaults_lenght = rebalance_vaults_lenght + 1;
             };
             last_vault_id = vault_id;
             vault_id_option = linked_table::next(&strategy.vaults, vault_id);
-            index = index + 1;
         };
         (rebalance_vaults, *vault_id_option)
     }
@@ -1009,8 +1014,6 @@ module turbos_assets_manage::vault {
             );
         };
         let (limit_lower_index, limit_upper_index) = (checkRebalance.limit_lower_index, checkRebalance.limit_upper_index);
-        let coin_a_left = coin::zero<CoinTypeA>(ctx);
-        let coin_b_left = coin::zero<CoinTypeB>(ctx);
         if (is_clmm_base_nft_exists(strategy, vault_id)) {
             if (checkRebalance.base_just_increase) {
                 //just increase
@@ -1033,14 +1036,14 @@ module turbos_assets_manage::vault {
                         clmm_versioned,
                         ctx,
                     );
-                    coin::join(&mut coin_a_left, base_coin_a_left);
-                    coin::join(&mut coin_b_left, base_coin_b_left);
+                    merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a_left));
+                    merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b_left));
                 };
             } else {
                 //burn current base position
                 let nft = borrow_mut_clmm_base_nft(strategy, vault_id);
                 let (_, _, liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(nft));
-                let (base_coin_a, base_coin_b) = decrease_clmm_liquidity(
+                let (base_coin_a_left, base_coin_b_left) = decrease_clmm_liquidity(
                     nft,
                     clmm_pool,
                     clmm_positions,
@@ -1049,8 +1052,8 @@ module turbos_assets_manage::vault {
                     clmm_versioned,
                     ctx,
                 );
-                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a));
-                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b));
+                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a_left));
+                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b_left));
                 burn_clmm_base_nft<CoinTypeA, CoinTypeB, FeeType>(
                     strategy,
                     vault_id,
@@ -1077,8 +1080,8 @@ module turbos_assets_manage::vault {
                         ctx,
                     );
 
-                    coin::join(&mut coin_a_left, base_coin_a_left);
-                    coin::join(&mut coin_b_left, base_coin_b_left);
+                    merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a_left));
+                    merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b_left));
                     (_,_ , base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&new_nft));  
                     base_clmm_position_id = position_nft::position_id(&new_nft);
                     fill_clmm_base_nft(strategy, vault_id, new_nft);
@@ -1105,16 +1108,14 @@ module turbos_assets_manage::vault {
                     ctx,
                 );
 
-                coin::join(&mut coin_a_left, base_coin_a_left);
-                coin::join(&mut coin_b_left, base_coin_b_left);
+                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_a_left));
+                merge_vault_balance(strategy, vault_id, coin::into_balance(base_coin_b_left));
                 (_,_ , base_liquidity) = position_manager::get_position_info(clmm_positions, object::id_address(&new_nft));  
                 base_clmm_position_id = position_nft::position_id(&new_nft);
                 fill_clmm_base_nft(strategy, vault_id, new_nft);
             };
             base_last_tick_index = current_tick_index;
         };
-        merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a_left));
-        merge_vault_balance(strategy, vault_id, coin::into_balance(coin_b_left));
 
         let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
         let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
