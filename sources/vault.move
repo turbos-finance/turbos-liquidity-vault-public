@@ -200,6 +200,8 @@ module turbos_assets_manage::vault {
         clmm_pool_id: ID,
         checkRebalance: CheckRebalance,
         sqrt_price: u128,
+        balance_amount_a: u64,
+        balance_amount_b: u64,
     }
 
     struct AddRewardEvent has copy, drop {
@@ -936,20 +938,11 @@ module turbos_assets_manage::vault {
         let base_upper_index = i32::from_u32_neg(base_tick_upper_index_u32, base_tick_upper_index_is_neg);
         let limit_lower_index = i32::from_u32_neg(limit_tick_lower_index_u32, limit_tick_lower_index_is_neg);
         let limit_upper_index = i32::from_u32_neg(limit_tick_upper_index_u32, limit_tick_upper_index_is_neg);
-        let checkRebalance = CheckRebalance {
-            vault_id,
-            rebalance,
-            base_lower_index,
-            base_upper_index,
-            base_just_increase,
-            limit_lower_index,
-            limit_upper_index
-        };
-
+       
         let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
         let current_tick_index = pool::get_pool_current_index(clmm_pool);
 
-        if (!checkRebalance.base_just_increase) {
+        if (!base_just_increase) {
             check_tick_range(
                 strategy.base_tick_step_minimum,
                 current_tick_index,
@@ -967,7 +960,7 @@ module turbos_assets_manage::vault {
             strategy.tick_spacing,
         );
 
-        if (!checkRebalance.rebalance) {
+        if (!rebalance) {
             return;
         };
         collect_clmm_fees(
@@ -1013,9 +1006,9 @@ module turbos_assets_manage::vault {
                 ctx
             );
         };
-        let (limit_lower_index, limit_upper_index) = (checkRebalance.limit_lower_index, checkRebalance.limit_upper_index);
+        let (limit_lower_index, limit_upper_index) = (limit_lower_index, limit_upper_index);
         if (is_clmm_base_nft_exists(strategy, vault_id)) {
-            if (checkRebalance.base_just_increase) {
+            if (base_just_increase) {
                 //just increase
                 let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
                 let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
@@ -1064,7 +1057,7 @@ module turbos_assets_manage::vault {
                 base_liquidity = 0;
                 let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
                 let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
-                let liquidity = calculate_liquidity(sqrt_price, checkRebalance.base_lower_index, checkRebalance.base_upper_index, amount_a, amount_b);
+                let liquidity = calculate_liquidity(sqrt_price, base_lower_index, base_upper_index, amount_a, amount_b);
                 if (liquidity > 0) {
                     let coin_a = coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx);
                     let coin_b = coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx);
@@ -1073,8 +1066,8 @@ module turbos_assets_manage::vault {
                         clmm_positions,
                         coin_a,
                         coin_b,
-                        checkRebalance.base_lower_index,
-                        checkRebalance.base_upper_index,
+                        base_lower_index,
+                        base_upper_index,
                         clock,
                         clmm_versioned,
                         ctx,
@@ -1092,7 +1085,7 @@ module turbos_assets_manage::vault {
             //The base position does not exist, and minting needs to be based on the capital situation.
             let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
             let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
-            let liquidity = calculate_liquidity(sqrt_price, checkRebalance.base_lower_index, checkRebalance.base_upper_index, amount_a, amount_b);
+            let liquidity = calculate_liquidity(sqrt_price, base_lower_index, base_upper_index, amount_a, amount_b);
             if (liquidity > 0) {
                 let coin_a = coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx);
                 let coin_b = coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx);
@@ -1101,8 +1094,8 @@ module turbos_assets_manage::vault {
                     clmm_positions,
                     coin_a,
                     coin_b,
-                    checkRebalance.base_lower_index,
-                    checkRebalance.base_upper_index,
+                    base_lower_index,
+                    base_upper_index,
                     clock,
                     clmm_versioned,
                     ctx,
@@ -1119,10 +1112,10 @@ module turbos_assets_manage::vault {
 
         let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
         let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
-        let bid_lower_index = checkRebalance.limit_lower_index;
+        let bid_lower_index = limit_lower_index;
         let bid_upper_index = floor_tick_index(current_tick_index, strategy.tick_spacing, true);
         let ask_lower_index = floor_tick_index(current_tick_index, strategy.tick_spacing, false);
-        let ask_upper_index = checkRebalance.limit_upper_index;
+        let ask_upper_index = limit_upper_index;
         let bid_liquidity = calculate_liquidity(sqrt_price, bid_lower_index, bid_upper_index, amount_a, amount_b);
         let ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a, amount_b);
         if (bid_liquidity > 0 || ask_liquidity > 0) {
@@ -1152,13 +1145,14 @@ module turbos_assets_manage::vault {
             merge_vault_balance(strategy, vault_id, coin::into_balance(limit_coin_b_left));
         };
         limit_last_tick_index = current_tick_index;
+
         
         update_vault_info_with_tick_range(
             strategy,
             vault_id,
             base_clmm_position_id,
-            checkRebalance.base_lower_index,
-            checkRebalance.base_upper_index,
+            base_lower_index,
+            base_upper_index,
             base_liquidity,
             limit_clmm_position_id,
             limit_lower_index,
@@ -1176,12 +1170,30 @@ module turbos_assets_manage::vault {
             clock
         );
 
+        let checkRebalance = CheckRebalance {
+            vault_id,
+            rebalance,
+            base_lower_index,
+            base_upper_index,
+            base_just_increase,
+            limit_lower_index,
+            limit_upper_index
+        };
+
+        let (balance_amount_a, balance_amount_b) = get_vault_total_amount(
+            strategy,
+            clmm_pool,
+            vault_id
+        );
+
         event::emit(RebalanceEvent {
             vault_id,
             strategy_id: object::id(strategy),
             clmm_pool_id: object::id(clmm_pool),
             checkRebalance: checkRebalance,
             sqrt_price,
+            balance_amount_a,
+            balance_amount_b
         });
     }
 
