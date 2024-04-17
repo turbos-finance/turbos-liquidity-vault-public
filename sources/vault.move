@@ -200,8 +200,12 @@ module turbos_assets_manage::vault {
         clmm_pool_id: ID,
         checkRebalance: CheckRebalance,
         sqrt_price: u128,
-        balance_amount_a: u64,
-        balance_amount_b: u64,
+        amount_a_left: u64,
+        amount_b_left: u64,
+        base_amount_a: u64,
+        base_amount_b: u64,
+        limit_amount_a: u64,
+        limit_amount_b: u64,
     }
 
     struct AddRewardEvent has copy, drop {
@@ -1180,10 +1184,17 @@ module turbos_assets_manage::vault {
             limit_upper_index
         };
 
-        let (balance_amount_a, balance_amount_b) = get_vault_total_amount(
+        let (
+            amount_a_left, 
+            amount_b_left, 
+            base_amount_a, 
+            base_amount_b, 
+            limit_amount_a, 
+            limit_amount_b
+        ) = get_vault_amount(
             strategy,
             clmm_pool,
-            vault_id
+            vault_id,
         );
 
         event::emit(RebalanceEvent {
@@ -1192,8 +1203,12 @@ module turbos_assets_manage::vault {
             clmm_pool_id: object::id(clmm_pool),
             checkRebalance: checkRebalance,
             sqrt_price,
-            balance_amount_a,
-            balance_amount_b
+            amount_a_left, 
+            amount_b_left, 
+            base_amount_a, 
+            base_amount_b, 
+            limit_amount_a, 
+            limit_amount_b
         });
     }
 
@@ -2512,34 +2527,62 @@ module turbos_assets_manage::vault {
         clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
         vault_id: ID,
     ): (u64, u64) {
-        let amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
-        let amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
+        let (
+            amount_a_left, 
+            amount_b_left, 
+            base_amount_a, 
+            base_amount_b, 
+            limit_amount_a, 
+            limit_amount_b
+        ) = get_vault_amount(
+            strategy,
+            clmm_pool,
+            vault_id,
+        );
+        let amount_a = amount_a_left + base_amount_a + limit_amount_a;
+        let amount_b = amount_b_left + base_amount_b + limit_amount_b;
+
+        (amount_a, amount_b)
+    }
+
+    public fun get_vault_amount<CoinTypeA, CoinTypeB, FeeType>(
+        strategy: &Strategy,
+        clmm_pool: &Pool<CoinTypeA, CoinTypeB, FeeType>,
+        vault_id: ID,
+    ): (u64, u64, u64, u64, u64, u64) {
+        let amount_a_left = get_vault_balance<CoinTypeA>(strategy, vault_id);
+        let amount_b_left = get_vault_balance<CoinTypeB>(strategy, vault_id);
         let vault_info = linked_table::borrow(&strategy.vaults, vault_id);
         let base_liquidity = vault_info.base_liquidity;
         let limit_liquidity = vault_info.limit_liquidity;
         let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
+        let (base_amount_a, base_amount_b) = (0, 0);
         if (base_liquidity > 0) {
-            let (base_amount_a, base_amount_b) = math_liquidity::get_amount_for_liquidity(
+            (base_amount_a, base_amount_b) = math_liquidity::get_amount_for_liquidity(
                 sqrt_price,
                 math_tick::sqrt_price_from_tick_index(vault_info.base_lower_index),
                 math_tick::sqrt_price_from_tick_index(vault_info.base_upper_index),
                 base_liquidity
             );
-            amount_a = amount_a + (base_amount_a as u64);
-            amount_b = amount_b + (base_amount_b as u64);
         };
+        let (limit_amount_a, limit_amount_b) = (0, 0);
         if (limit_liquidity > 0) {
-            let (limit_amount_a, limit_amount_b) = math_liquidity::get_amount_for_liquidity(
+            (limit_amount_a, limit_amount_b) = math_liquidity::get_amount_for_liquidity(
                 sqrt_price,
                 math_tick::sqrt_price_from_tick_index(vault_info.base_lower_index),
                 math_tick::sqrt_price_from_tick_index(vault_info.base_upper_index),
                 base_liquidity
             );
-            amount_a = amount_a + (limit_amount_a as u64);
-            amount_b = amount_b + (limit_amount_b as u64);
         };
 
-        (amount_a, amount_b)
+        (
+            amount_a_left, 
+            amount_b_left, 
+            (base_amount_a as u64), 
+            (base_amount_b as u64), 
+            (limit_amount_a as u64), 
+            (limit_amount_b as u64)
+        )
     }
 
     public fun get_strategy_status(
