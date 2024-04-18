@@ -1234,7 +1234,11 @@ module turbos_assets_manage::vault {
     ): I32 {
         let tick_spacing_i32 = i32::from(tick_spacing);
         if (i32::eq(i32::mod(tick_index, tick_spacing_i32), i32::zero())) {
-            return tick_index
+            if (is_lower) {
+                return i32::sub(tick_index, tick_spacing_i32)
+            } else {
+                return i32::add(tick_index, tick_spacing_i32)
+            }
         };
         let remainder = i32::sub(tick_index, i32::mod(tick_index, tick_spacing_i32));
         if (i32::gt(tick_index, i32::zero())) {
@@ -2569,9 +2573,9 @@ module turbos_assets_manage::vault {
         if (limit_liquidity > 0) {
             (limit_amount_a, limit_amount_b) = math_liquidity::get_amount_for_liquidity(
                 sqrt_price,
-                math_tick::sqrt_price_from_tick_index(vault_info.base_lower_index),
-                math_tick::sqrt_price_from_tick_index(vault_info.base_upper_index),
-                base_liquidity
+                math_tick::sqrt_price_from_tick_index(vault_info.limit_lower_index),
+                math_tick::sqrt_price_from_tick_index(vault_info.limit_upper_index),
+                limit_liquidity
             );
         };
 
@@ -2650,15 +2654,16 @@ module turbos_assets_manage::vault {
             10, 
         );
         let tick_index = floor_tick_index(curent_index, tick_spacing, false);
-        assert!(i32::eq(tick_index, i32::from(10)), 1);
+        assert!(i32::eq(tick_index, i32::from(20)), 1);
         let tick_index = floor_tick_index(curent_index, tick_spacing, true);
-        assert!(i32::eq(tick_index, i32::from(10)), 1);
+        assert!(i32::eq(tick_index, i32::from(0)), 1);
 
         let (curent_index, tick_spacing) = (
             i32::from(11), 
             10, 
         );
         let tick_index = floor_tick_index(curent_index, tick_spacing, false);
+
         assert!(i32::eq(tick_index, i32::from(20)), 1);
         let tick_index = floor_tick_index(curent_index, tick_spacing, true);
         assert!(i32::eq(tick_index, i32::from(10)), 1);
@@ -2677,9 +2682,9 @@ module turbos_assets_manage::vault {
             10, 
         );
         let tick_index = floor_tick_index(curent_index, tick_spacing, false);
-        assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
+        assert!(i32::eq(tick_index, i32::neg_from(0)), 1);
         let tick_index = floor_tick_index(curent_index, tick_spacing, true);
-        assert!(i32::eq(tick_index, i32::neg_from(10)), 1);
+        assert!(i32::eq(tick_index, i32::neg_from(20)), 1);
 
         let (curent_index, tick_spacing) = (
             i32::neg_from(11), 
