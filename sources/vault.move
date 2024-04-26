@@ -91,6 +91,7 @@ module turbos_assets_manage::vault {
         // Map from user address -> vault id.
         // user_vaults: Table<address, u64>,
         protocol_fee_rate: u64,
+        performance_fee_rate: u64,
         protocol_fees: Bag,
         image_url: String,
         tick_spacing: u32,
@@ -221,12 +222,19 @@ module turbos_assets_manage::vault {
         new_rate: u64,
     }
 
+    struct UpdatePerformanceFeeRateEvent has copy, drop {
+        strategy_id: ID,
+        old_rate: u64,
+        new_rate: u64,
+    }
+
     struct ClmmRewardClaimedEvent has copy, drop {
         vault_id: ID,
         strategy_id: ID,
         clmm_pool_id: ID,
         clmm_nft_id: ID,
         amount: u64,
+        performance_fee: u64,
         reward_type_name: TypeName,
     }
 
@@ -244,6 +252,8 @@ module turbos_assets_manage::vault {
         clmm_nft_id: ID,
 	    amount_a: u64,
 	    amount_b: u64,
+        performance_fee_a: u64,
+	    performance_fee_b: u64,
         coin_a_type_name: TypeName,
 	    coin_b_type_name: TypeName,
     }
@@ -319,6 +329,7 @@ module turbos_assets_manage::vault {
             vault_index: 0,
             accounts: table::new(ctx),
             protocol_fee_rate: 0,
+            performance_fee_rate: 0,
             protocol_fees: bag::new(ctx),
             image_url,
             tick_spacing,
@@ -1956,6 +1967,18 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
+
+        //performance fee
+        let performance_fee_rate = strategy.performance_fee_rate;
+        let performance_fee = if (performance_fee_rate == 0) {
+            0
+        } else {
+            let fee_amount = full_math_u64::mul_div_ceil(coin::value(&reward_coin), performance_fee_rate, FEE_RATE_SCALE);
+            let performance_asset = coin::split(&mut reward_coin, fee_amount, ctx);
+            merge_protocol_asset(strategy, coin::into_balance(performance_asset));
+            fee_amount
+        };
+
         let amount = coin::value(&reward_coin);
 
         event::emit(ClmmRewardClaimedEvent {
@@ -1964,6 +1987,7 @@ module turbos_assets_manage::vault {
             clmm_pool_id,
             clmm_nft_id,
             amount,
+            performance_fee,
             reward_type_name: type_name::get<RewardCoin>(),
         });
     
@@ -2000,6 +2024,18 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
+
+        //performance fee
+        let performance_fee_rate = strategy.performance_fee_rate;
+        let performance_fee = if (performance_fee_rate == 0) {
+            0
+        } else {
+            let fee_amount = full_math_u64::mul_div_ceil(coin::value(&reward_coin), performance_fee_rate, FEE_RATE_SCALE);
+            let performance_asset = coin::split(&mut reward_coin, fee_amount, ctx);
+            merge_protocol_asset(strategy, coin::into_balance(performance_asset));
+            fee_amount
+        };
+
         let amount = coin::value(&reward_coin);
 
          event::emit(ClmmRewardClaimedEvent {
@@ -2008,6 +2044,7 @@ module turbos_assets_manage::vault {
             clmm_pool_id,
             clmm_nft_id,
             amount,
+            performance_fee,
             reward_type_name: type_name::get<RewardCoin>(),
         });
     
@@ -2041,6 +2078,23 @@ module turbos_assets_manage::vault {
             ctx,
         );
 
+        //performance fee
+        let performance_fee_rate = strategy.performance_fee_rate;
+        let (performance_fee_a, performance_fee_b) = if (performance_fee_rate == 0) {
+            (0, 0)
+        } else {
+            let fee_a_amount = full_math_u64::mul_div_ceil(coin::value(&coin_a), performance_fee_rate, FEE_RATE_SCALE);
+            let fee_b_amount = full_math_u64::mul_div_ceil(coin::value(&coin_b), performance_fee_rate, FEE_RATE_SCALE);
+
+            let performance_asset_a = coin::split(&mut coin_a, fee_a_amount, ctx);
+            let performance_asset_b = coin::split(&mut coin_b, fee_b_amount, ctx);
+
+            merge_protocol_asset(strategy, coin::into_balance(performance_asset_a));
+            merge_protocol_asset(strategy, coin::into_balance(performance_asset_b));
+
+            (fee_a_amount, fee_b_amount)
+        };
+
         let amount_a = coin::value<CoinTypeA>(&coin_a);
         let amount_b = coin::value<CoinTypeB>(&coin_b);
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
@@ -2053,6 +2107,8 @@ module turbos_assets_manage::vault {
             clmm_nft_id,
             amount_a,
             amount_b,
+            performance_fee_a,
+            performance_fee_b,
             coin_a_type_name: type_name::get<CoinTypeA>(),
             coin_b_type_name: type_name::get<CoinTypeB>(),
         })
@@ -2085,6 +2141,24 @@ module turbos_assets_manage::vault {
             clmm_versioned,
             ctx,
         );
+
+        //performance fee
+        let performance_fee_rate = strategy.performance_fee_rate;
+        let (performance_fee_a, performance_fee_b) = if (performance_fee_rate == 0) {
+            (0, 0)
+        } else {
+            let fee_a_amount = full_math_u64::mul_div_ceil(coin::value(&coin_a), performance_fee_rate, FEE_RATE_SCALE);
+            let fee_b_amount = full_math_u64::mul_div_ceil(coin::value(&coin_b), performance_fee_rate, FEE_RATE_SCALE);
+
+            let performance_asset_a = coin::split(&mut coin_a, fee_a_amount, ctx);
+            let performance_asset_b = coin::split(&mut coin_b, fee_b_amount, ctx);
+
+            merge_protocol_asset(strategy, coin::into_balance(performance_asset_a));
+            merge_protocol_asset(strategy, coin::into_balance(performance_asset_b));
+
+            (fee_a_amount, fee_b_amount)
+        };
+
         let amount_a = coin::value<CoinTypeA>(&coin_a);
         let amount_b = coin::value<CoinTypeB>(&coin_b);
         merge_vault_balance(strategy, vault_id, coin::into_balance(coin_a));
@@ -2097,6 +2171,8 @@ module turbos_assets_manage::vault {
             clmm_nft_id,
             amount_a,
             amount_b,
+            performance_fee_a,
+            performance_fee_b,
             coin_a_type_name: type_name::get<CoinTypeA>(),
             coin_b_type_name: type_name::get<CoinTypeB>(),
         })
@@ -2261,6 +2337,28 @@ module turbos_assets_manage::vault {
         strategy.protocol_fee_rate = new_rate;
 
         event::emit(UpdateFeeRateEvent {
+            strategy_id: object::id(strategy),
+            old_rate,
+            new_rate,
+        });
+        new_rate
+    }
+
+    public(friend) fun update_strategy_performance_fee_rate(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        new_rate: u64,
+    ): u64 {
+        config::checked_package_version(global_config);
+        let operator_address = object::id_address<OperatorCap>(operator_cap);
+        config::check_vault_manager_role(global_config, operator_address);
+
+        assert!(new_rate <= FEE_RATE_SCALE, ETooLargeProtocolFee);
+        let old_rate = strategy.performance_fee_rate;
+        strategy.performance_fee_rate = new_rate;
+
+        event::emit(UpdatePerformanceFeeRateEvent {
             strategy_id: object::id(strategy),
             old_rate,
             new_rate,

@@ -371,6 +371,20 @@ module turbos_assets_manage::router {
         );
     }
 
+    entry public fun update_strategy_performance_fee_rate(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        new_rate: u64,
+    ) {
+        vault::update_strategy_performance_fee_rate(
+            operator_cap,
+            global_config,
+            strategy,
+            new_rate
+        );
+    }
+
     entry public fun update_strategy_status(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
