@@ -90,7 +90,7 @@ module turbos_assets_manage::vault {
         accounts: Table<ID, Account>,
         // Map from user address -> vault id.
         // user_vaults: Table<address, u64>,
-        protocol_fee_rate: u64,
+        management_fee_rate: u64,
         performance_fee_rate: u64,
         protocol_fees: Bag,
         image_url: String,
@@ -142,6 +142,8 @@ module turbos_assets_manage::vault {
         limit_tick_step: u32,
         share: u128,
         rewards: VecMap<TypeName, VaultRewardInfo>,
+        management_fee_rate: Option<u64>,
+        performance_fee_rate: Option<u64>,
     }
 
     struct CheckRebalance has copy, drop {
@@ -216,14 +218,28 @@ module turbos_assets_manage::vault {
         allocate_point: u64
     }
 
-    struct UpdateFeeRateEvent has copy, drop {
+    struct UpdateStrategyManagementFeeRateEvent has copy, drop {
         strategy_id: ID,
         old_rate: u64,
         new_rate: u64,
     }
 
-    struct UpdatePerformanceFeeRateEvent has copy, drop {
+    struct UpdateStrategyPerformanceFeeRateEvent has copy, drop {
         strategy_id: ID,
+        old_rate: u64,
+        new_rate: u64,
+    }
+
+    struct UpdateVaultPerformanceFeeRateEvent has copy, drop {
+        strategy_id: ID,
+        vault_id: ID,
+        old_rate: u64,
+        new_rate: u64,
+    }
+
+    struct UpdateVaultManagementFeeRateEvent has copy, drop {
+        strategy_id: ID,
+        vault_id: ID,
         old_rate: u64,
         new_rate: u64,
     }
@@ -328,7 +344,7 @@ module turbos_assets_manage::vault {
             vaults,
             vault_index: 0,
             accounts: table::new(ctx),
-            protocol_fee_rate: 0,
+            management_fee_rate: 0,
             performance_fee_rate: 0,
             protocol_fees: bag::new(ctx),
             image_url,
@@ -475,6 +491,8 @@ module turbos_assets_manage::vault {
             limit_tick_step,
             share: 0,
             rewards: vec_map::empty<TypeName, VaultRewardInfo>(),
+            management_fee_rate: option::none<u64>(),
+            performance_fee_rate: option::none<u64>(),
         };
         linked_table::push_back<ID, VaultInfo>(&mut strategy.vaults, vault_id, vault_info);
         strategy.vault_index = new_vault_index;
@@ -716,12 +734,12 @@ module turbos_assets_manage::vault {
         coin::join(&mut coin_b_out, coin::from_balance(balance_b, ctx));
         
         //protocol fee
-        let protocol_fee_rate = strategy.protocol_fee_rate;
-        let (protocol_fee_a, protocol_fee_b) = if (protocol_fee_rate == 0) {
+        let management_fee_rate = get_management_fee_rate(strategy, vault_id);
+        let (protocol_fee_a, protocol_fee_b) = if (management_fee_rate == 0) {
             (0, 0)
         } else {
-            let fee_a_amount = full_math_u64::mul_div_ceil(coin::value(&coin_a_out), protocol_fee_rate, FEE_RATE_SCALE);
-            let fee_b_amount = full_math_u64::mul_div_ceil(coin::value(&coin_b_out), protocol_fee_rate, FEE_RATE_SCALE);
+            let fee_a_amount = full_math_u64::mul_div_ceil(coin::value(&coin_a_out), management_fee_rate, FEE_RATE_SCALE);
+            let fee_b_amount = full_math_u64::mul_div_ceil(coin::value(&coin_b_out), management_fee_rate, FEE_RATE_SCALE);
 
             let protocol_asset_a = coin::split(&mut coin_a_out, fee_a_amount, ctx);
             let protocol_asset_b = coin::split(&mut coin_b_out, fee_b_amount, ctx);
@@ -1969,7 +1987,7 @@ module turbos_assets_manage::vault {
         );
 
         //performance fee
-        let performance_fee_rate = strategy.performance_fee_rate;
+        let performance_fee_rate = get_performance_fee_rate(strategy, vault_id);
         let performance_fee = if (performance_fee_rate == 0) {
             0
         } else {
@@ -2026,7 +2044,7 @@ module turbos_assets_manage::vault {
         );
 
         //performance fee
-        let performance_fee_rate = strategy.performance_fee_rate;
+        let performance_fee_rate = get_performance_fee_rate(strategy, vault_id);
         let performance_fee = if (performance_fee_rate == 0) {
             0
         } else {
@@ -2079,7 +2097,7 @@ module turbos_assets_manage::vault {
         );
 
         //performance fee
-        let performance_fee_rate = strategy.performance_fee_rate;
+        let performance_fee_rate = get_performance_fee_rate(strategy, vault_id);
         let (performance_fee_a, performance_fee_b) = if (performance_fee_rate == 0) {
             (0, 0)
         } else {
@@ -2143,7 +2161,7 @@ module turbos_assets_manage::vault {
         );
 
         //performance fee
-        let performance_fee_rate = strategy.performance_fee_rate;
+        let performance_fee_rate = get_performance_fee_rate(strategy, vault_id);
         let (performance_fee_a, performance_fee_b) = if (performance_fee_rate == 0) {
             (0, 0)
         } else {
@@ -2322,7 +2340,7 @@ module turbos_assets_manage::vault {
         image_url
     }
 
-    public(friend) fun update_strategy_protocol_fee_rate(
+    public(friend) fun update_strategy_management_fee_rate(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
@@ -2333,10 +2351,10 @@ module turbos_assets_manage::vault {
         config::check_vault_manager_role(global_config, operator_address);
 
         assert!(new_rate <= FEE_RATE_SCALE, ETooLargeProtocolFee);
-        let old_rate = strategy.protocol_fee_rate;
-        strategy.protocol_fee_rate = new_rate;
+        let old_rate = strategy.management_fee_rate;
+        strategy.management_fee_rate = new_rate;
 
-        event::emit(UpdateFeeRateEvent {
+        event::emit(UpdateStrategyManagementFeeRateEvent {
             strategy_id: object::id(strategy),
             old_rate,
             new_rate,
@@ -2358,7 +2376,7 @@ module turbos_assets_manage::vault {
         let old_rate = strategy.performance_fee_rate;
         strategy.performance_fee_rate = new_rate;
 
-        event::emit(UpdatePerformanceFeeRateEvent {
+        event::emit(UpdateStrategyPerformanceFeeRateEvent {
             strategy_id: object::id(strategy),
             old_rate,
             new_rate,
@@ -2460,11 +2478,87 @@ module turbos_assets_manage::vault {
         limit_rebalance_threshold
     }
 
+    public(friend) fun update_vault_performance_fee_rate(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault_id: ID,
+        new_rate: u64,
+    ): u64 {
+        config::checked_package_version(global_config);
+        let operator_address = object::id_address<OperatorCap>(operator_cap);
+        config::check_vault_manager_role(global_config, operator_address);
+
+        let vault_info = borrow_mut_vault_info(strategy, vault_id);
+        assert!(new_rate <= FEE_RATE_SCALE, ETooLargeProtocolFee);
+        let old_rate = option::get_with_default(&vault_info.performance_fee_rate, 0);
+        option::fill(&mut vault_info.performance_fee_rate, new_rate);
+
+        event::emit(UpdateVaultPerformanceFeeRateEvent {
+            strategy_id: object::id(strategy),
+            vault_id,
+            old_rate,
+            new_rate,
+        });
+        new_rate
+    }
+
+    public(friend) fun update_vault_management_fee_rate(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault_id: ID,
+        new_rate: u64,
+    ): u64 {
+        config::checked_package_version(global_config);
+        let operator_address = object::id_address<OperatorCap>(operator_cap);
+        config::check_vault_manager_role(global_config, operator_address);
+
+        let vault_info = borrow_mut_vault_info(strategy, vault_id);
+        assert!(new_rate <= FEE_RATE_SCALE, ETooLargeProtocolFee);
+        let old_rate = option::get_with_default(&vault_info.management_fee_rate, 0);
+        option::fill(&mut vault_info.management_fee_rate, new_rate);
+
+        event::emit(UpdateVaultManagementFeeRateEvent {
+            strategy_id: object::id(strategy),
+            vault_id,
+            old_rate,
+            new_rate,
+        });
+        new_rate
+    }
+
     fun  borrow_mut_vault_account(
         strategy: &mut Strategy,
         vault_id: ID,
     ): &mut Account {
         table::borrow_mut(&mut strategy.accounts, vault_id)
+    }
+
+    public fun  get_management_fee_rate(
+        strategy: &Strategy,
+        vault_id: ID,
+    ): u64 {
+        let vault_info = borrow_vault_info(strategy, vault_id);
+        let fee_rate = if (!option::is_none(&vault_info.management_fee_rate)) {
+            *option::borrow(&vault_info.management_fee_rate)
+        } else {
+            strategy.management_fee_rate
+        };
+        fee_rate
+    }
+
+    public fun  get_performance_fee_rate(
+        strategy: &Strategy,
+        vault_id: ID,
+    ): u64 {
+        let vault_info = borrow_vault_info(strategy, vault_id);
+        let fee_rate = if (!option::is_none(&vault_info.performance_fee_rate)) {
+            *option::borrow(&vault_info.performance_fee_rate)
+        } else {
+            strategy.performance_fee_rate
+        };
+        fee_rate
     }
 
     public fun  borrow_vault_account(

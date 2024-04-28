@@ -357,13 +357,13 @@ module turbos_assets_manage::router {
         transfer::public_transfer(coin, recipient);
     }
 
-    entry public fun update_strategy_protocol_fee_rate(
+    entry public fun update_strategy_management_fee_rate(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         strategy: &mut Strategy,
         new_rate: u64,
     ) {
-        vault::update_strategy_protocol_fee_rate(
+        vault::update_strategy_management_fee_rate(
             operator_cap,
             global_config,
             strategy,
@@ -484,6 +484,38 @@ module turbos_assets_manage::router {
             strategy,
             vault_id,
             limit_rebalance_threshold
+        );
+    }
+
+    entry public fun update_vault_performance_fee_rate(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault_id: ID,
+        new_rate: u64,
+    ) {
+        vault::update_vault_performance_fee_rate(
+            operator_cap,
+            global_config,
+            strategy,
+            vault_id,
+            new_rate
+        );
+    }
+
+    entry public fun update_vault_management_fee_rate(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault_id: ID,
+        new_rate: u64,
+    ) {
+        vault::update_vault_management_fee_rate(
+            operator_cap,
+            global_config,
+            strategy,
+            vault_id,
+            new_rate
         );
     }
 }
