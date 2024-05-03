@@ -37,6 +37,10 @@ module turbos_assets_manage::router {
         config::set_package_version(admin_cap, config, new_version);
     }
 
+    entry public fun set_tier(admin_cap: &AdminCap, global_config: &mut GlobalConfig, user: address, rebate: u64, discount: u64, ctx: &mut TxContext) {
+        config::set_tier(admin_cap, global_config, user, rebate, discount, ctx);
+    }
+
     entry fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,

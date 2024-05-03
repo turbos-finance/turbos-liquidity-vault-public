@@ -672,6 +672,7 @@ module turbos_assets_manage::vault {
         let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
         let vault_id = object::id(vault);
         collect_clmm_fees(
+            global_config,
             strategy,
             vault_id,
             clmm_pool,
@@ -734,7 +735,7 @@ module turbos_assets_manage::vault {
         coin::join(&mut coin_b_out, coin::from_balance(balance_b, ctx));
         
         //protocol fee
-        let management_fee_rate = get_management_fee_rate(strategy, vault_id);
+        let management_fee_rate = get_management_fee_rate(global_config, strategy, vault_id, ctx);
         let (protocol_fee_a, protocol_fee_b) = if (management_fee_rate == 0) {
             (0, 0)
         } else {
@@ -997,6 +998,7 @@ module turbos_assets_manage::vault {
             return;
         };
         collect_clmm_fees(
+            global_config,
             strategy,
             vault_id,
             clmm_pool,
@@ -1597,6 +1599,7 @@ module turbos_assets_manage::vault {
 
 
     fun collect_clmm_fees<CoinTypeA, CoinTypeB, FeeType>(
+        global_config: &GlobalConfig,
         strategy: &mut Strategy,
         vault_id: ID,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -1607,6 +1610,7 @@ module turbos_assets_manage::vault {
     ) {
         if (is_clmm_base_nft_exists(strategy, vault_id)) {
             collect_clmm_base_fees(
+                global_config,
                 strategy,
                 vault_id,
                 clmm_pool,
@@ -1618,6 +1622,7 @@ module turbos_assets_manage::vault {
         };
         if (is_clmm_limit_nft_exists(strategy, vault_id)) {
             collect_clmm_limit_fees(
+                global_config,
                 strategy,
                 vault_id,
                 clmm_pool,
@@ -1848,6 +1853,7 @@ module turbos_assets_manage::vault {
         let vault_id = object::id(vault);
         let reward_type = type_name::get<RewardCoinType>();
         let reward_balance = collect_clmm_reward(
+            global_config,
             strategy,
             object::id(vault),
             clmm_pool,
@@ -1892,6 +1898,7 @@ module turbos_assets_manage::vault {
         config::check_rebalance_manager_role(global_config, operator_address);
 
         let reward_balance = collect_clmm_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoinType>(
+            global_config,
             strategy,
             vault_id,
             clmm_pool,
@@ -1909,6 +1916,7 @@ module turbos_assets_manage::vault {
 
 
     fun collect_clmm_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
+        global_config: &GlobalConfig,
         strategy: &mut Strategy,
         vault_id: ID,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -1923,6 +1931,7 @@ module turbos_assets_manage::vault {
         let reward_balance = balance::zero();
         if (is_clmm_base_nft_exists(strategy, vault_id)) {
             let base_reward_coin = collect_clmm_base_reward(
+                global_config,
                 strategy,
                 vault_id,
                 clmm_pool,
@@ -1939,6 +1948,7 @@ module turbos_assets_manage::vault {
 
         if (is_clmm_limit_nft_exists(strategy, vault_id)) {
             let limit_reward_coin = collect_clmm_limit_reward(
+                global_config,
                 strategy,
                 vault_id,
                 clmm_pool,
@@ -1957,6 +1967,7 @@ module turbos_assets_manage::vault {
     }
 
     fun collect_clmm_base_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
+        global_config: &GlobalConfig,
         strategy: &mut Strategy,
         vault_id: ID,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -1987,7 +1998,7 @@ module turbos_assets_manage::vault {
         );
 
         //performance fee
-        let performance_fee_rate = get_performance_fee_rate(strategy, vault_id);
+        let performance_fee_rate = get_performance_fee_rate(global_config, strategy, vault_id, ctx);
         let performance_fee = if (performance_fee_rate == 0) {
             0
         } else {
@@ -2013,6 +2024,7 @@ module turbos_assets_manage::vault {
     }
 
     fun collect_clmm_limit_reward<CoinTypeA, CoinTypeB, FeeType, RewardCoin>(
+        global_config: &GlobalConfig,
         strategy: &mut Strategy,
         vault_id: ID,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -2044,7 +2056,7 @@ module turbos_assets_manage::vault {
         );
 
         //performance fee
-        let performance_fee_rate = get_performance_fee_rate(strategy, vault_id);
+        let performance_fee_rate = get_performance_fee_rate(global_config, strategy, vault_id, ctx);
         let performance_fee = if (performance_fee_rate == 0) {
             0
         } else {
@@ -2071,6 +2083,7 @@ module turbos_assets_manage::vault {
 
 
     fun collect_clmm_base_fees<CoinTypeA, CoinTypeB, FeeType>(
+        global_config: &GlobalConfig,
         strategy: &mut Strategy,
         vault_id: ID,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -2097,7 +2110,7 @@ module turbos_assets_manage::vault {
         );
 
         //performance fee
-        let performance_fee_rate = get_performance_fee_rate(strategy, vault_id);
+        let performance_fee_rate = get_performance_fee_rate(global_config, strategy, vault_id, ctx);
         let (performance_fee_a, performance_fee_b) = if (performance_fee_rate == 0) {
             (0, 0)
         } else {
@@ -2134,6 +2147,7 @@ module turbos_assets_manage::vault {
 
 
     fun collect_clmm_limit_fees<CoinTypeA, CoinTypeB, FeeType>(
+        global_config: &GlobalConfig,
         strategy: &mut Strategy,
         vault_id: ID,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
@@ -2161,7 +2175,7 @@ module turbos_assets_manage::vault {
         );
 
         //performance fee
-        let performance_fee_rate = get_performance_fee_rate(strategy, vault_id);
+        let performance_fee_rate = get_performance_fee_rate(global_config, strategy, vault_id, ctx);
         let (performance_fee_a, performance_fee_b) = if (performance_fee_rate == 0) {
             (0, 0)
         } else {
@@ -2536,8 +2550,10 @@ module turbos_assets_manage::vault {
     }
 
     public fun  get_management_fee_rate(
+        global_config: &GlobalConfig,
         strategy: &Strategy,
         vault_id: ID,
+        ctx: &mut TxContext,
     ): u64 {
         let vault_info = borrow_vault_info(strategy, vault_id);
         let fee_rate = if (!option::is_none(&vault_info.management_fee_rate)) {
@@ -2545,12 +2561,18 @@ module turbos_assets_manage::vault {
         } else {
             strategy.management_fee_rate
         };
+        let (_, discount) = config::get_tier(global_config, tx_context::sender(ctx));
+        if (discount > 0) {
+            fee_rate = fee_rate * (FEE_RATE_SCALE - discount) / FEE_RATE_SCALE;
+        };
         fee_rate
     }
 
     public fun  get_performance_fee_rate(
+        global_config: &GlobalConfig,
         strategy: &Strategy,
         vault_id: ID,
+        ctx: &mut TxContext,
     ): u64 {
         let vault_info = borrow_vault_info(strategy, vault_id);
         let fee_rate = if (!option::is_none(&vault_info.performance_fee_rate)) {

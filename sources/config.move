@@ -8,6 +8,7 @@ module turbos_assets_manage::config {
     use sui::table;
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
+    use sui::vec_map::{Self, VecMap};
 
     friend turbos_assets_manage::router;
 
@@ -15,8 +16,11 @@ module turbos_assets_manage::config {
     const EWrongVaultManager: u64 =1;
     const EWrongRewardManager: u64 = 2;
     const EWrongRebalanceManager: u64 = 3;
+    const EInvilidRebate: u64 = 4;
+    const EInvilidDiscount: u64 = 5;
 
     const VERSION: u64 = 1;
+    const TIER_RATE_SCALE: u64 = 1000000;
 
     struct AdminCap has store, key {
 	    id: UID
@@ -26,10 +30,16 @@ module turbos_assets_manage::config {
 	    id: UID
     }
 
+    struct Tier has copy, drop, store {
+        rebate: u64, // e.g. 240000 for 24%
+        discount: u64, // 50000 for 5% discount
+    }
+
     struct GlobalConfig has store, key {
 	    id: UID,
 	    acl: ACL,
-	    package_version: u64
+	    package_version: u64,
+        user_tiers: VecMap<address, Tier>,
     }
 
     struct InitConfigEvent has copy, drop {
@@ -67,6 +77,12 @@ module turbos_assets_manage::config {
 	    old_version: u64
     }
 
+     struct SetTierEvent has copy, drop {
+	    user: address,
+	    rebate: u64,
+        discount: u64,
+    }
+
     fun init(ctx: &mut TxContext) {
         let admin_cap= AdminCap {
             id: object::new(ctx),
@@ -76,6 +92,7 @@ module turbos_assets_manage::config {
             id: object::new(ctx),
             acl,
             package_version: 1,
+            user_tiers: vec_map::empty(),
         };
         let admin_cap_id = object::id(&admin_cap);
         let global_config_id = object::id(&global_config);
@@ -128,6 +145,46 @@ module turbos_assets_manage::config {
         let old_version = global_config.package_version;
         global_config.package_version = new_version;
         event::emit(SetPackageVersion { new_version, old_version });
+    }
+
+    public(friend) fun set_tier(
+        admin_cap: &AdminCap,
+        global_config: &mut GlobalConfig,
+        user: address,
+        rebate: u64,
+        discount: u64,
+        ctx: &mut TxContext,
+    ) {
+        assert!(rebate <= TIER_RATE_SCALE, EInvilidRebate);
+        assert!(discount <= TIER_RATE_SCALE, EInvilidDiscount);
+        if (vec_map::contains(&global_config.user_tiers, &user)) {
+            let tier = vec_map::get_mut(&mut global_config.user_tiers, &user);
+            tier.rebate = rebate;
+            tier.discount = discount;
+        } else {
+            vec_map::insert(&mut global_config.user_tiers, user, Tier {
+                rebate,
+                discount,
+            });
+        };
+        
+        event::emit(SetTierEvent {
+            user,
+            rebate,
+            discount,
+        })
+    }
+
+    public fun get_tier(
+        global_config: &GlobalConfig,
+        user: address,
+    ): (u64, u64) {
+        if (vec_map::contains(&global_config.user_tiers, &user)) {
+            let tier = vec_map::get(&global_config.user_tiers, &user);
+            (tier.rebate, tier.discount)
+        } else {
+            (0, 0)
+        }
     }
 
     public fun get_members(global_config: &GlobalConfig): vector<Member> {
