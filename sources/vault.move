@@ -852,7 +852,8 @@ module turbos_assets_manage::vault {
         let rebalance_vaults_lenght = 0;
         let last_vault_id;
         let vault_id_option = &option::some(current_vault_id);
-        while(!option::is_none(vault_id_option) && rebalance_vaults_lenght < limit) {
+        let loop_limit_index = 0;
+        while(!option::is_none(vault_id_option) && rebalance_vaults_lenght < limit && loop_limit_index < 200) {
             let vault_id = *option::borrow(vault_id_option);
             let checkRebalance = check_rebalance(
                 global_config,
@@ -867,6 +868,7 @@ module turbos_assets_manage::vault {
             };
             last_vault_id = vault_id;
             vault_id_option = linked_table::next(&strategy.vaults, vault_id);
+            loop_limit_index = loop_limit_index + 1;
         };
         (rebalance_vaults, *vault_id_option)
     }
