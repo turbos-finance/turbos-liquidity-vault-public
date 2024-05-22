@@ -211,6 +211,15 @@ module turbos_assets_manage::vault {
         limit_amount_b: u64,
     }
 
+    struct CollectRebalanceFeeEvent has copy, drop {
+        vault_id: ID,
+        strategy_id: ID,
+        fee_amount_a: u64,
+        fee_amount_b: u64,
+        remaining_fee_amount_a: u64,
+        remaining_fee_amount_b: u64,
+    }
+
     struct AddRewardEvent has copy, drop {
         strategy_id: ID,
         clmm_pool_id: ID,
@@ -943,8 +952,7 @@ module turbos_assets_manage::vault {
         }
     }
 
-    
-    public fun rebalance<CoinTypeA, CoinTypeB, FeeType>(
+    public fun rebalance_with_fee<CoinTypeA, CoinTypeB, FeeType>(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
         rewarder_manager: &mut RewarderManager,
@@ -962,10 +970,12 @@ module turbos_assets_manage::vault {
         limit_tick_upper_index_is_neg: bool,
         clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
         clmm_positions: &mut Positions,
+        rebalance_fee_amount_a: u64,
+        rebalance_fee_amount_b: u64,
         clock: &Clock,
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
-    ) {
+    ): (Coin<CoinTypeA>, Coin<CoinTypeB>) {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
         let operator_address = object::id_address<OperatorCap>(operator_cap);
@@ -977,6 +987,9 @@ module turbos_assets_manage::vault {
        
         let sqrt_price = pool::get_pool_sqrt_price(clmm_pool);
         let current_tick_index = pool::get_pool_current_index(clmm_pool);
+
+        let rebalance_fee_a = balance::zero<CoinTypeA>();
+        let rebalance_fee_b = balance::zero<CoinTypeB>();
 
         if (!base_just_increase) {
             check_tick_range(
@@ -996,9 +1009,6 @@ module turbos_assets_manage::vault {
             strategy.tick_spacing,
         );
 
-        if (!rebalance) {
-            return;
-        };
         collect_clmm_fees(
             global_config,
             strategy,
@@ -1043,6 +1053,7 @@ module turbos_assets_manage::vault {
                 ctx
             );
         };
+
         let (limit_lower_index, limit_upper_index) = (limit_lower_index, limit_upper_index);
         if (is_clmm_base_nft_exists(strategy, vault_id)) {
             if (base_just_increase) {
@@ -1157,10 +1168,21 @@ module turbos_assets_manage::vault {
         let ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a, amount_b);
         if (bid_liquidity > 0 || ask_liquidity > 0) {
             (limit_lower_index, limit_upper_index) = if (bid_liquidity > ask_liquidity) {
+                rebalance_fee_amount_a = 0;
                 (bid_lower_index, bid_upper_index)
             } else {
+                rebalance_fee_amount_b = 0;
                 (ask_lower_index, ask_upper_index)
             };
+
+            collect_rebalance_fee<CoinTypeA, CoinTypeB>(
+                strategy,
+                vault_id,
+                rebalance_fee_amount_a,
+                rebalance_fee_amount_b,
+                &mut rebalance_fee_a,
+                &mut rebalance_fee_b,
+            );
             let coin_a = coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx);
             let coin_b = coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx);
             let (nft_limit, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
@@ -1241,8 +1263,65 @@ module turbos_assets_manage::vault {
             base_amount_a, 
             base_amount_b, 
             limit_amount_a, 
-            limit_amount_b
+            limit_amount_b,
         });
+
+        (coin::from_balance(rebalance_fee_a, ctx), coin::from_balance(rebalance_fee_b, ctx))
+    }
+
+    fun collect_rebalance_fee<CoinTypeA, CoinTypeB>(
+        strategy: &mut Strategy,
+        vault_id: ID,
+        amount_a: u64,
+        amount_b: u64,
+        fee_balance_a: &mut Balance<CoinTypeA>,
+        fee_balance_b: &mut Balance<CoinTypeB>
+    ) {
+        let (amount_a_remaining, amount_b_remaining) = (amount_a - balance::value(fee_balance_a), amount_b - balance::value(fee_balance_b));
+        if (amount_a_remaining > 0) {
+            let balance_a = take_vault_balance_by_amount<CoinTypeA>(strategy, vault_id, amount_a_remaining);
+            balance::join(fee_balance_a, balance_a);
+        };
+
+        if (amount_b_remaining > 0) {
+            let balance_b = take_vault_balance_by_amount<CoinTypeB>(strategy, vault_id, amount_b_remaining);
+            balance::join(fee_balance_b, balance_b);
+        };
+
+        event::emit(CollectRebalanceFeeEvent {
+            vault_id,
+            strategy_id: object::id(strategy),
+            fee_amount_a: amount_a,
+            fee_amount_b: amount_b,
+            remaining_fee_amount_a: amount_a - balance::value(fee_balance_a),
+            remaining_fee_amount_b: amount_b - balance::value(fee_balance_b),
+        });
+    }
+
+    
+    public fun rebalance<CoinTypeA, CoinTypeB, FeeType>(
+        operator_cap: &OperatorCap,
+        global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
+        strategy: &mut Strategy,
+        vault_id: ID,
+        rebalance: bool,
+        base_just_increase: bool,
+        base_tick_lower_index_u32: u32,
+        base_tick_lower_index_is_neg: bool,
+        base_tick_upper_index_u32: u32,
+        base_tick_upper_index_is_neg: bool,
+        limit_tick_lower_index_u32: u32,
+        limit_tick_lower_index_is_neg: bool,
+        limit_tick_upper_index_u32: u32,
+        limit_tick_upper_index_is_neg: bool,
+        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
+        clmm_positions: &mut Positions,
+        clock: &Clock,
+        clmm_versioned: &Versioned,
+        ctx: &mut TxContext
+    ) {
+        abort(0)
     }
 
     public fun calculate_tick_index(
@@ -1710,9 +1789,11 @@ module turbos_assets_manage::vault {
         let type_name = get_type_name_str<BalanceType>();
 
         let account = borrow_mut_vault_account(strategy, vault_id);
-        let balance = if (bag::contains<String>(&account.balances, type_name)) {
+        let balance = if (bag::contains<String>(&account.balances, type_name) && amount > 0) {
             let balance_ref = bag::borrow_mut<String, Balance<BalanceType>>(&mut account.balances, type_name);
-            balance::split<BalanceType>(balance_ref, amount)
+            let balance_amount = balance::value(balance_ref);
+            let amount_real = if (balance_amount >= amount) amount else balance_amount;
+            balance::split<BalanceType>(balance_ref, amount_real)
         } else {
             balance::zero<BalanceType>()
         };
