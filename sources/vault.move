@@ -29,7 +29,7 @@ module turbos_assets_manage::vault {
     use turbos_clmm::full_math_u64;
     use turbos_clmm::full_math_u32;
     use sui::clock::{Self, Clock};
-    use turbos_assets_manage::config::{Self, GlobalConfig, OperatorCap};
+    use turbos_assets_manage::config::{Self, GlobalConfig, OperatorCap, UserTierConfig};
     use turbos_assets_manage::rewarder::{Self, RewarderManager};
 
 
@@ -659,9 +659,26 @@ module turbos_assets_manage::vault {
         });
     }
 
-    
     public fun withdraw<CoinTypeA, CoinTypeB, FeeType>(
         global_config: &GlobalConfig,
+        rewarder_manager: &mut RewarderManager,
+        strategy: &mut Strategy,
+        vault: &mut Vault,
+        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
+        clmm_positions: &mut Positions,
+        percentage: u64, //mul WITHDRAW_PERCENTAGE_SCALE
+        burn_clmm_nft: bool,
+        clock: &Clock,
+        clmm_versioned: &Versioned,
+        ctx: &mut TxContext
+    ): (Coin<CoinTypeA>, Coin<CoinTypeB>) {
+        abort(0)
+    }
+
+    
+    public fun withdraw_v2<CoinTypeA, CoinTypeB, FeeType>(
+        global_config: &GlobalConfig,
+        user_tier_config: &mut UserTierConfig,
         rewarder_manager: &mut RewarderManager,
         strategy: &mut Strategy,
         vault: &mut Vault,
@@ -744,7 +761,7 @@ module turbos_assets_manage::vault {
         coin::join(&mut coin_b_out, coin::from_balance(balance_b, ctx));
         
         //protocol fee
-        let management_fee_rate = get_management_fee_rate(global_config, strategy, vault_id, ctx);
+        let management_fee_rate = get_management_fee_rate_v2(global_config, user_tier_config, strategy, vault_id, ctx);
         let (protocol_fee_a, protocol_fee_b) = if (management_fee_rate == 0) {
             (0, 0)
         } else {
@@ -2638,13 +2655,24 @@ module turbos_assets_manage::vault {
         vault_id: ID,
         ctx: &mut TxContext,
     ): u64 {
+        abort(0)
+    }
+
+    public fun  get_management_fee_rate_v2(
+        global_config: &GlobalConfig,
+        user_tier_config: &mut UserTierConfig,
+        strategy: &Strategy,
+        vault_id: ID,
+        ctx: &mut TxContext,
+    ): u64 {
+        config::checked_package_version(global_config);
         let vault_info = borrow_vault_info(strategy, vault_id);
         let fee_rate = if (!option::is_none(&vault_info.management_fee_rate)) {
             *option::borrow(&vault_info.management_fee_rate)
         } else {
             strategy.management_fee_rate
         };
-        let (_, discount) = config::get_tier(global_config, tx_context::sender(ctx));
+        let (_, discount) = config::get_tier_v2(global_config, user_tier_config, tx_context::sender(ctx));
         if (discount > 0) {
             fee_rate = fee_rate * (FEE_RATE_SCALE - discount) / FEE_RATE_SCALE;
         };

@@ -5,7 +5,7 @@ module turbos_assets_manage::config {
     use turbos_assets_manage::acl::{Self, ACL, Member};
     use sui::event;
     use sui::object::{Self, ID, UID};
-    use sui::table;
+    use sui::table::{Self, Table};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
     use sui::vec_map::{Self, VecMap};
@@ -40,6 +40,11 @@ module turbos_assets_manage::config {
 	    acl: ACL,
 	    package_version: u64,
         user_tiers: VecMap<address, Tier>,
+    }
+
+    struct UserTierConfig has store, key {
+	    id: UID,
+        user_tiers: Table<address, Tier>,
     }
 
     struct InitConfigEvent has copy, drop {
@@ -77,10 +82,15 @@ module turbos_assets_manage::config {
 	    old_version: u64
     }
 
-     struct SetTierEvent has copy, drop {
+    struct SetTierEvent has copy, drop {
 	    user: address,
 	    rebate: u64,
         discount: u64,
+    }
+
+    struct InitUserTierConfigEvent has copy, drop {
+	    admin_cap_id: ID,
+	    user_tier_config_id: ID
     }
 
     fun init(ctx: &mut TxContext) {
@@ -101,6 +111,21 @@ module turbos_assets_manage::config {
         event::emit(InitConfigEvent {
             admin_cap_id,
             global_config_id,
+        });
+    }
+
+    public(friend) fun new_user_tier_config(admin_cap: &AdminCap, ctx: &mut TxContext) {
+        let user_tier_config = UserTierConfig {
+            id: object::new(ctx),
+            user_tiers: table::new(ctx),
+        };
+        let admin_cap_id = object::id(admin_cap);
+        let user_tier_config_id = object::id(&user_tier_config);
+        transfer::public_share_object(user_tier_config);
+
+        event::emit(InitUserTierConfigEvent {
+            admin_cap_id,
+            user_tier_config_id,
         });
     }
 
@@ -155,14 +180,27 @@ module turbos_assets_manage::config {
         discount: u64,
         ctx: &mut TxContext,
     ) {
+        abort(0)
+    }
+
+    public(friend) fun set_tier_v2(
+        admin_cap: &AdminCap,
+        global_config: &GlobalConfig,
+        user_tier_config: &mut UserTierConfig,
+        user: address,
+        rebate: u64,
+        discount: u64,
+        ctx: &mut TxContext,
+    ) {
+        checked_package_version(global_config);
         assert!(rebate <= TIER_RATE_SCALE, EInvilidRebate);
         assert!(discount <= TIER_RATE_SCALE, EInvilidDiscount);
-        if (vec_map::contains(&global_config.user_tiers, &user)) {
-            let tier = vec_map::get_mut(&mut global_config.user_tiers, &user);
+        if (table::contains(&user_tier_config.user_tiers, user)) {
+            let tier = table::borrow_mut(&mut user_tier_config.user_tiers, user);
             tier.rebate = rebate;
             tier.discount = discount;
         } else {
-            vec_map::insert(&mut global_config.user_tiers, user, Tier {
+            table::add(&mut user_tier_config.user_tiers, user, Tier {
                 rebate,
                 discount,
             });
@@ -179,8 +217,16 @@ module turbos_assets_manage::config {
         global_config: &GlobalConfig,
         user: address,
     ): (u64, u64) {
-        if (vec_map::contains(&global_config.user_tiers, &user)) {
-            let tier = vec_map::get(&global_config.user_tiers, &user);
+        abort(0)
+    }
+
+    public fun get_tier_v2(
+        global_config: &GlobalConfig,
+        user_tier_config: &mut UserTierConfig,
+        user: address,
+    ): (u64, u64) {
+        if (table::contains(&user_tier_config.user_tiers, user)) {
+            let tier = table::borrow(&user_tier_config.user_tiers, user);
             (tier.rebate, tier.discount)
         } else {
             (0, 0)
