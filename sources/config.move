@@ -130,6 +130,7 @@ module turbos_assets_manage::config {
     }
 
     public(friend) fun add_operator(admin_cap: &AdminCap, global_config: &mut GlobalConfig, roles: u128, recipient: address, ctx: &mut TxContext) {
+        checked_package_version(global_config);
         let operator_cap = OperatorCap { id: object::new(ctx) };
         let operator_id = object::id(&operator_cap);
         acl::set_roles(&mut global_config.acl, object::id_address(&operator_cap), roles);
@@ -168,6 +169,7 @@ module turbos_assets_manage::config {
 
     public(friend) fun set_package_version(admin_cap: &AdminCap, global_config: &mut GlobalConfig, new_version: u64) {
         let old_version = global_config.package_version;
+        assert!(new_version > old_version, EWrongVersion);
         global_config.package_version = new_version;
         event::emit(SetPackageVersion { new_version, old_version });
     }
@@ -225,6 +227,7 @@ module turbos_assets_manage::config {
         user_tier_config: &mut UserTierConfig,
         user: address,
     ): (u64, u64) {
+        checked_package_version(global_config);
         if (table::contains(&user_tier_config.user_tiers, user)) {
             let tier = table::borrow(&user_tier_config.user_tiers, user);
             (tier.rebate, tier.discount)

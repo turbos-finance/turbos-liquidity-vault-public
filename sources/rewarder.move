@@ -28,6 +28,7 @@ module turbos_assets_manage::rewarder {
     const EStrategyAlreadyRegistered: u64 = 3;
     const EStrategyNotInRewarder: u64 = 4;
     const ERewardNotEnough: u64 = 5;
+    const EInvalidAmount: u64 = 6;
 
 
     struct StrategyRewarderInfo has store {
@@ -104,6 +105,7 @@ module turbos_assets_manage::rewarder {
         ctx: &mut TxContext
     ) {
         config::checked_package_version(config);
+        assert!(coin::value<T>(&coin) > 0, EInvalidAmount);
 
         let type_name = type_name::get<T>();
         if (!bag::contains<TypeName>(&manager.vault, type_name)) {
@@ -137,6 +139,8 @@ module turbos_assets_manage::rewarder {
 
         let type_name = type_name::get<T>();
 
+        assert!(!linked_table::contains<TypeName, Rewarder>(&manager.rewarders, type_name), EInvalidRewardType);
+
         let current_time = clock::timestamp_ms(clock) / 1000;
 
         let strategys = linked_table::new<ID, StrategyRewarderInfo>(ctx);
@@ -150,8 +154,6 @@ module turbos_assets_manage::rewarder {
             total_reward_harvested: 0,
             strategys: strategys,
         };
-
-        assert!(!linked_table::contains<TypeName, Rewarder>(&manager.rewarders, type_name), EInvalidRewardType);
 
         linked_table::push_back<TypeName, Rewarder>(&mut manager.rewarders, type_name, rewarder);
 
@@ -208,7 +210,7 @@ module turbos_assets_manage::rewarder {
         strategy_id: ID, 
         clock: &Clock
     ): VecMap<TypeName, u128> {
-        assert!(linked_table::contains<ID, u128>(&manager.strategy_shares, strategy_id), EStrategyNotRegistered);
+        assert!(is_strategy_registered(manager, strategy_id), EStrategyNotRegistered);
         
         //The proportion of the reward for the strategy
         let strategy_share = linked_table::borrow<ID, u128>(&manager.strategy_shares, strategy_id);
@@ -229,7 +231,7 @@ module turbos_assets_manage::rewarder {
 
     // total_reward_released = total_reward_released + (emission_per_second * elapsed_time)
     public(friend)  fun accumulate_rewarder_released(rewarder: &mut Rewarder, current_time: u64) {
-        if (rewarder.last_reward_time <= current_time) {
+        if (rewarder.last_reward_time < current_time) {
             let elapsed_time = current_time - rewarder.last_reward_time;
             if (rewarder.emission_per_second > 0) {
                 let additional_rewards = rewarder.emission_per_second * elapsed_time;
@@ -243,10 +245,6 @@ module turbos_assets_manage::rewarder {
         // Obtain a mutable reference to the specific rewarder by its type.
         let type_name = type_name::get<T>();
         let rewarder = linked_table::borrow_mut<TypeName, Rewarder>(&mut manager.rewarders, type_name);
-
-        if (rewarder.emission_per_second == 0) {
-            return;
-        };
 
         let current_opt = linked_table::front<ID, StrategyRewarderInfo>(&rewarder.strategys);
         while (option::is_some(current_opt)) {
@@ -272,11 +270,14 @@ module turbos_assets_manage::rewarder {
             let elapsed_time = current_time - strategy_info.last_reward_time;
             let new_rewards_total = rewarder.emission_per_second * elapsed_time;
             let new_rewards_strategy = new_rewards_total * strategy_info.allocate_point / rewarder.total_allocate_point;
-            strategy_info.acc_per_share = strategy_info.acc_per_share + full_math_u128::mul_div_floor((new_rewards_strategy as u128), REWARD_SCALE_FACTOR, strategy_share);
-            strategy_info.last_reward_time = current_time;
-            rewarder.total_reward_released = rewarder.total_reward_released + (new_rewards_total as u128);
+            if (strategy_share > 0) {
+                strategy_info.acc_per_share = strategy_info.acc_per_share + full_math_u128::mul_div_floor((new_rewards_strategy as u128), REWARD_SCALE_FACTOR, strategy_share);
+            } else {
+                strategy_info.acc_per_share = 0;
+            };
+            //rewarder.total_reward_released = rewarder.total_reward_released + (new_rewards_total as u128);
         };
-
+        strategy_info.last_reward_time = current_time;
         strategy_info.acc_per_share
     }
 
@@ -351,7 +352,13 @@ module turbos_assets_manage::rewarder {
         let operator_address = object::id_address<OperatorCap>(operator_cap);
         config::check_reward_manager_role(config, operator_address);
 
-        vector::append(&mut manager.black_list, addreses);
+        while(vector::length(&addreses) > 0) {
+            let owner_address = vector::pop_back(&mut addreses);
+            if (!vector::contains(&manager.black_list, &owner_address)) {
+                vector::push_back(&mut manager.black_list, owner_address);
+            }
+        }
+
     }
 
     public fun remove_reward_black_list(
