@@ -9,7 +9,7 @@ module turbos_assets_manage::router {
     use sui::vec_map::{Self, VecMap};
     use turbos_clmm::i32::{Self, I32};
     use sui::coin::{Self, Coin};
-    use turbos_assets_manage::config::{Self, AdminCap, GlobalConfig, OperatorCap};
+    use turbos_assets_manage::config::{Self, AdminCap, GlobalConfig, OperatorCap, UserTierConfig};
     use turbos_assets_manage::vault::{Self, Vault, Strategy};
     use turbos_clmm::pool::{Self, Pool, Versioned, PoolRewardVault};
     use turbos_clmm::position_manager::{Self, Positions};
@@ -38,7 +38,15 @@ module turbos_assets_manage::router {
     }
 
     entry public fun set_tier(admin_cap: &AdminCap, global_config: &mut GlobalConfig, user: address, rebate: u64, discount: u64, ctx: &mut TxContext) {
-        config::set_tier(admin_cap, global_config, user, rebate, discount, ctx);
+        abort(0);
+    }
+
+    entry public fun new_user_tier_config(admin_cap: &AdminCap, ctx: &mut TxContext) {
+        config::new_user_tier_config(admin_cap, ctx);
+    }
+
+    entry public fun set_tier_v2(admin_cap: &AdminCap, global_config: &mut GlobalConfig, user_tier_config: &mut UserTierConfig, user: address, rebate: u64, discount: u64, ctx: &mut TxContext) {
+        config::set_tier_v2(admin_cap, global_config, user_tier_config, user, rebate, discount, ctx);
     }
 
     entry fun create_strategy<CoinTypeA, CoinTypeB, FeeType>(
@@ -227,8 +235,27 @@ module turbos_assets_manage::router {
         clmm_versioned: &Versioned,
         ctx: &mut TxContext
     ) {
-        let (coin_a, coin_b) = vault::withdraw(
+        abort(0)
+    }
+
+    entry public fun withdraw_v2<CoinTypeA, CoinTypeB, FeeType>(
+        global_config: &GlobalConfig,
+        user_tier_config: &mut UserTierConfig,
+        rewarder_manager: &mut RewarderManager,
+        strategy: &mut Strategy,
+        vault: &mut Vault,
+        clmm_pool: &mut Pool<CoinTypeA, CoinTypeB, FeeType>,
+        clmm_positions: &mut Positions,
+        percentage: u64, //0~100
+        burn_clmm_nft: bool,
+        recipient: address,
+        clock: &Clock,
+        clmm_versioned: &Versioned,
+        ctx: &mut TxContext
+    ) {
+        let (coin_a, coin_b) = vault::withdraw_v2(
             global_config,
+            user_tier_config,
             rewarder_manager,
             strategy,
             vault,
