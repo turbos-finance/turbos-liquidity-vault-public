@@ -1,19 +1,19 @@
 [package]
 name = "TurbosAssetsManage"
-version = "0.0.1"
+version = "0.0.2"
 
 
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
-rev = "testnet"
+rev = "mainnet"
 
 [dependencies.TurbosCLMM]
-#git = "git@github.com:turbos-finance/turbos-clmm.git"
-#rev = "testnet"
-local = "../turbos-clmm"
+git = "git@github.com:turbos-finance/turbos-sui-move-interface.git"
+subdir = "clmm"
+rev = "mainnet-v0.0.9"
+#local = "../turbos-clmm"
 
 [addresses]
 turbos_assets_manage = "0x0"
 sui =  "0000000000000000000000000000000000000000000000000000000000000002"
-turbos_clmm = "0x800d280a8c03db824964d49e76fc8504c10c2d63b81c962af287e1157f15c920"

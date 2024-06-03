@@ -1183,15 +1183,13 @@ module turbos_assets_manage::vault {
         let ask_upper_index = limit_upper_index;
         let bid_liquidity = calculate_liquidity(sqrt_price, bid_lower_index, bid_upper_index, amount_a, amount_b);
         let ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a, amount_b);
-        if (bid_liquidity > 0 || ask_liquidity > 0) {
-            (limit_lower_index, limit_upper_index) = if (bid_liquidity > ask_liquidity) {
+
+        if (rebalance_fee_amount_a > 0 || rebalance_fee_amount_b > 0) {
+            if (bid_liquidity > ask_liquidity) {
                 rebalance_fee_amount_a = 0;
-                (bid_lower_index, bid_upper_index)
             } else {
                 rebalance_fee_amount_b = 0;
-                (ask_lower_index, ask_upper_index)
             };
-
             collect_rebalance_fee<CoinTypeA, CoinTypeB>(
                 strategy,
                 vault_id,
@@ -1200,6 +1198,20 @@ module turbos_assets_manage::vault {
                 &mut rebalance_fee_a,
                 &mut rebalance_fee_b,
             );
+            //After charging the rebalance fee, liquidity needs to be recalculated.
+            amount_a = get_vault_balance<CoinTypeA>(strategy, vault_id);
+            amount_b = get_vault_balance<CoinTypeB>(strategy, vault_id);
+            bid_liquidity = calculate_liquidity(sqrt_price, bid_lower_index, bid_upper_index, amount_a, amount_b);
+            ask_liquidity = calculate_liquidity(sqrt_price, ask_lower_index, ask_upper_index, amount_a, amount_b);
+        };
+        
+        if (bid_liquidity > 0 || ask_liquidity > 0) {
+            (limit_lower_index, limit_upper_index) = if (bid_liquidity > ask_liquidity) {
+                (bid_lower_index, bid_upper_index)
+            } else {
+                (ask_lower_index, ask_upper_index)
+            };
+
             let coin_a = coin::from_balance(take_vault_balance<CoinTypeA>(strategy, vault_id), ctx);
             let coin_b = coin::from_balance(take_vault_balance<CoinTypeB>(strategy, vault_id), ctx);
             let (nft_limit, limit_coin_a_left, limit_coin_b_left) = mint_clmm_liquidity(
