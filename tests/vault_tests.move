@@ -25,7 +25,7 @@ module turbos_assets_manage::vault_tests {
     use turbos_clmm::pool_factory::{Self, PoolFactoryAdminCap, PoolConfig};
     use turbos_clmm::math_sqrt_price::{Self};
     use turbos_assets_manage::vault::{Self, Vault, Strategy};
-    use turbos_assets_manage::config::{Self, AdminCap, GlobalConfig, OperatorCap};
+    use turbos_assets_manage::config::{Self, AdminCap, GlobalConfig, OperatorCap, UserTierConfig};
     use turbos_assets_manage::router;
     use turbos_assets_manage::rewarder::{Self, RewarderManager};
     use sui::clock::{Clock};
@@ -154,6 +154,15 @@ module turbos_assets_manage::vault_tests {
             config::init_for_testing(test_scenario::ctx(scenario));
         };
 
+        //init user tier config
+        test_scenario::next_tx(scenario, admin);
+        {
+            let admin_cap = test_scenario::take_from_sender<AdminCap>(scenario);
+            router::new_user_tier_config(&admin_cap, test_scenario::ctx(scenario));
+            test_scenario::return_to_sender(scenario, admin_cap);
+        };
+
+
         //init rewarder
         test_scenario::next_tx(scenario, admin);
         {
@@ -243,6 +252,7 @@ module turbos_assets_manage::vault_tests {
         {
             let operator_cap = test_scenario::take_from_sender<OperatorCap>(scenario);
             let global_config = test_scenario::take_shared<GlobalConfig>(scenario);
+            let user_tier_config = test_scenario::take_shared<UserTierConfig>(scenario);
             let rewarder_manager = test_scenario::take_shared<RewarderManager>(scenario);
             let clmm_pool = test_scenario::take_shared<Pool<BTC, USDC, FEE3000BPS>>(scenario);
             let clmm_positions = test_scenario::take_shared<Positions>(scenario);
@@ -324,8 +334,9 @@ module turbos_assets_manage::vault_tests {
             assert_eq(balance_b_amount, 199999999);
 
             //withdraw 50%
-            let (coin_a, coin_b) = vault::withdraw(
+            let (coin_a, coin_b) = vault::withdraw_v2(
                 &global_config,
+                &mut user_tier_config,
                 &mut rewarder_manager,
                 &mut strategy,
                 &mut vault,
@@ -419,7 +430,7 @@ module turbos_assets_manage::vault_tests {
             assert_eq(rebalance, true);
 
             //rebalance
-            vault::rebalance(
+            let (rebalance_fee_a, rebalance_fee_b) = vault::rebalance_with_fee(
                 &operator_cap,
                 &global_config,
                 &mut rewarder_manager,
@@ -437,6 +448,8 @@ module turbos_assets_manage::vault_tests {
                 i32::is_neg(limit_upper_index),
                 &mut clmm_pool,
                 &mut clmm_positions,
+                0,
+                0,
                 &clock,
                 &versioned,
                 test_scenario::ctx(scenario),
@@ -485,7 +498,7 @@ module turbos_assets_manage::vault_tests {
             assert_eq(base_just_increase, true);
 
             //rebalance
-            vault::rebalance(
+            let (rebalance_fee_a_2, rebalance_fee_b_2) = vault::rebalance_with_fee(
                 &operator_cap,
                 &global_config,
                 &mut rewarder_manager,
@@ -503,10 +516,14 @@ module turbos_assets_manage::vault_tests {
                 i32::is_neg(limit_upper_index),
                 &mut clmm_pool,
                 &mut clmm_positions,
+                0,
+                0,
                 &clock,
                 &versioned,
                 test_scenario::ctx(scenario),
             );
+            coin::join(&mut rebalance_fee_a, rebalance_fee_a_2);
+            coin::join(&mut rebalance_fee_b, rebalance_fee_b_2);
 
             assert_eq(vault::get_vault_base_last_tick_index(&strategy, vault_id), i32::from(509));
             assert_eq(vault::get_vault_limit_last_tick_index(&strategy, vault_id), i32::from(663));
@@ -551,7 +568,7 @@ module turbos_assets_manage::vault_tests {
             assert_eq(rebalance, true);
             assert_eq(base_just_increase, false);
 
-            vault::rebalance(
+            let (rebalance_fee_a_3, rebalance_fee_b_3) = vault::rebalance_with_fee(
                 &operator_cap,
                 &global_config,
                 &mut rewarder_manager,
@@ -569,11 +586,15 @@ module turbos_assets_manage::vault_tests {
                 i32::is_neg(limit_upper_index),
                 &mut clmm_pool,
                 &mut clmm_positions,
+                0,
+                0,
                 &clock,
                 &versioned,
                 test_scenario::ctx(scenario),
 
             );
+            coin::join(&mut rebalance_fee_a, rebalance_fee_a_3);
+            coin::join(&mut rebalance_fee_b, rebalance_fee_b_3);
 
             assert_eq(vault::get_vault_base_last_tick_index(&strategy, vault_id), i32::from(3221));
             assert_eq(vault::get_vault_limit_last_tick_index(&strategy, vault_id), i32::from(3221));
@@ -624,7 +645,7 @@ module turbos_assets_manage::vault_tests {
             assert_eq(rebalance, true);
             assert_eq(base_just_increase, false);
 
-            vault::rebalance(
+            let (rebalance_fee_a_4, rebalance_fee_b_4) = vault::rebalance_with_fee(
                 &operator_cap,
                 &global_config,
                 &mut rewarder_manager,
@@ -642,11 +663,15 @@ module turbos_assets_manage::vault_tests {
                 i32::is_neg(limit_upper_index),
                 &mut clmm_pool,
                 &mut clmm_positions,
+                0,
+                0,
                 &clock,
                 &versioned,
                 test_scenario::ctx(scenario),
 
             );
+            coin::join(&mut rebalance_fee_a, rebalance_fee_a_4);
+            coin::join(&mut rebalance_fee_b, rebalance_fee_b_4);
 
             // let vault_info = vault::borrow_vault_info(&strategy, vault_id);
             // std::debug::print(vault_info);
@@ -674,8 +699,9 @@ module turbos_assets_manage::vault_tests {
             );
 
             //withdraw all
-            let (coin_a, coin_b) = vault::withdraw(
+            let (coin_a, coin_b) = vault::withdraw_v2(
                 &global_config,
+                &mut user_tier_config,
                 &mut rewarder_manager,
                 &mut strategy,
                 &mut vault,
@@ -689,6 +715,7 @@ module turbos_assets_manage::vault_tests {
             );
             coin::join(&mut btc, coin_a);
             coin::join(&mut usdc, coin_b);
+            
 
             //close vault
             vault::close_vault<BTC, USDC>(
@@ -700,7 +727,10 @@ module turbos_assets_manage::vault_tests {
 
             test_scenario::return_to_sender(scenario, btc);
             test_scenario::return_to_sender(scenario, usdc);
+            transfer::public_transfer(rebalance_fee_a, player);
+            transfer::public_transfer(rebalance_fee_b, player);
             test_scenario::return_shared(global_config);
+            test_scenario::return_shared(user_tier_config);
             test_scenario::return_to_sender(scenario, operator_cap);
             test_scenario::return_shared(clmm_pool);
             test_scenario::return_shared(clock);
