@@ -1019,9 +1019,12 @@ module turbos_assets_manage::vault {
         let rebalance_fee_a = balance::zero<CoinTypeA>();
         let rebalance_fee_b = balance::zero<CoinTypeB>();
 
+        let base_tick_step = get_vault_base_tick_step(strategy, vault_id);
+        let limit_tick_step = get_vault_limit_tick_step(strategy, vault_id);
+
         if (!base_just_increase) {
             check_tick_range(
-                strategy.base_tick_step_minimum,
+                base_tick_step,
                 current_tick_index,
                 base_lower_index,
                 base_upper_index,
@@ -1030,7 +1033,7 @@ module turbos_assets_manage::vault {
         };
 
         check_tick_range(
-            strategy.limit_tick_step_minimum,
+            limit_tick_step,
             current_tick_index,
             limit_lower_index,
             limit_upper_index,
@@ -2776,12 +2779,28 @@ module turbos_assets_manage::vault {
         vault_info.base_liquidity
     }
 
+    public fun  get_vault_base_tick_step(
+        strategy: &Strategy,
+        vault_id: ID,
+    ): u32 {
+        let vault_info = linked_table::borrow(&strategy.vaults, vault_id);
+        vault_info.base_tick_step
+    }
+
     public fun  get_vault_base_last_tick_index(
         strategy: &Strategy,
         vault_id: ID,
     ): I32 {
         let vault_info = linked_table::borrow(&strategy.vaults, vault_id);
         vault_info.base_last_tick_index
+    }
+
+    public fun  get_vault_limit_tick_step(
+        strategy: &Strategy,
+        vault_id: ID,
+    ): u32 {
+        let vault_info = linked_table::borrow(&strategy.vaults, vault_id);
+        vault_info.limit_tick_step
     }
 
     public fun  get_vault_limit_liquidity(
