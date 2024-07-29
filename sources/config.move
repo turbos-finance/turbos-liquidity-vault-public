@@ -19,7 +19,7 @@ module turbos_assets_manage::config {
     const EInvilidRebate: u64 = 4;
     const EInvilidDiscount: u64 = 5;
 
-    const VERSION: u64 = 2;
+    const VERSION: u64 = 3;
     const TIER_RATE_SCALE: u64 = 1000000;
 
     struct AdminCap has store, key {
