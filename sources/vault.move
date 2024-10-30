@@ -66,6 +66,7 @@ module turbos_assets_manage::vault {
     const ENoDeedRebalance: u64 = 20;
     const EInvalidBaseTickStep: u64 = 21;
     const EInvalidlimitTickStep: u64 = 22;
+    const EInvalidVaultId: u64 = 23;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -885,6 +886,7 @@ module turbos_assets_manage::vault {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
         assert!(limit > 0, EInvalidLimit);
+        assert!(is_vault_exists(strategy, current_vault_id), EInvalidVaultId);
 
         let rebalance_vaults = vector::empty();
         let rebalance_vaults_lenght = 0;
@@ -2779,6 +2781,13 @@ module turbos_assets_manage::vault {
     ): &VaultInfo {
         let vault_info = linked_table::borrow(&strategy.vaults, vault_id);
         vault_info
+    }
+
+    public fun  is_vault_exists(
+        strategy: &Strategy,
+        vault_id: ID,
+    ): bool {
+        linked_table::contains(&strategy.vaults, vault_id)
     }
 
     fun  remove_vault_info(
