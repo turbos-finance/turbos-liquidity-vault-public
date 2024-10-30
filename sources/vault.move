@@ -2622,6 +2622,36 @@ module turbos_assets_manage::vault {
         limit_rebalance_threshold
     }
 
+    public(friend) fun update_vault_base_rebalance_threshold_by_owner(
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault: &Vault,
+        base_rebalance_threshold: u32,
+    ): u32 {
+        config::checked_package_version(global_config);
+        let vault_id = object::id(vault);
+
+        let vault_info = borrow_mut_vault_info(strategy, vault_id);
+        vault_info.base_rebalance_threshold = base_rebalance_threshold;
+
+        base_rebalance_threshold
+    }
+
+    public(friend) fun update_vault_limit_rebalance_threshold_by_owner(
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault: &Vault,
+        limit_rebalance_threshold: u32,
+    ): u32 {
+        config::checked_package_version(global_config);
+        let vault_id = object::id(vault);
+
+        let vault_info = borrow_mut_vault_info(strategy, vault_id);
+        vault_info.limit_rebalance_threshold = limit_rebalance_threshold;
+
+        limit_rebalance_threshold
+    }
+
     public(friend) fun update_vault_performance_fee_rate(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,

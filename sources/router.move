@@ -518,6 +518,35 @@ module turbos_assets_manage::router {
         );
     }
 
+    entry public fun update_vault_base_rebalance_threshold_by_owner(
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault: &Vault,
+        base_rebalance_threshold: u32,
+    ) {
+        vault::update_vault_base_rebalance_threshold_by_owner(
+            global_config,
+            strategy,
+            vault,
+            base_rebalance_threshold
+        );
+    }
+
+    entry public fun update_vault_limit_rebalance_threshold_by_owner(
+        global_config: &GlobalConfig,
+        strategy: &mut Strategy,
+        vault: &Vault,
+        limit_rebalance_threshold: u32,
+    ) {
+        vault::update_vault_limit_rebalance_threshold_by_owner(
+            global_config,
+            strategy,
+            vault,
+            limit_rebalance_threshold
+        );
+    }
+
+
     entry public fun update_vault_performance_fee_rate(
         operator_cap: &OperatorCap,
         global_config: &GlobalConfig,
