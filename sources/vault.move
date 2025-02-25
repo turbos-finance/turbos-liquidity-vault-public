@@ -41,6 +41,7 @@ module turbos_assets_manage::vault {
     const CLMM_DEADLINE_MS: u64 = 60000;
     const REWARD_SCALE_FACTOR: u128 = 1000000000;
     const SHARE_SCALE_FACTOR: u256 = 1000000000;
+    const MAX_TICK_INDEX: u32 = 443636;
 
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
@@ -63,6 +64,9 @@ module turbos_assets_manage::vault {
     const ENotTheCorrespondingStrategyVault: u64 = 18;
     const EInvalidLimit: u64 = 19;
     const ENoDeedRebalance: u64 = 20;
+    const EInvalidBaseTickStep: u64 = 21;
+    const EInvalidlimitTickStep: u64 = 22;
+    const EInvalidVaultId: u64 = 23;
 
     // <<<<<<<<<<<<<<<<<<<<<<<< Error codes <<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -437,7 +441,9 @@ module turbos_assets_manage::vault {
         assert!(strategy.status == 0, EStrategyLocked);
         assert!(strategy.clmm_pool_id == object::id(clmm_pool), ENotTheCorrespondingStrategy);
         assert!(base_tick_step >= strategy.base_tick_step_minimum && limit_tick_step >= strategy.limit_tick_step_minimum, ETickRangeTooSmall);
-        
+        assert!(base_tick_step * strategy.tick_spacing < MAX_TICK_INDEX, EInvalidBaseTickStep);
+        assert!(limit_tick_step * strategy.tick_spacing < MAX_TICK_INDEX, EInvalidlimitTickStep);
+
         let base_lower_index = i32::from_u32_neg(base_tick_lower_index_u32, base_tick_lower_index_is_neg);
         let base_upper_index = i32::from_u32_neg(base_tick_upper_index_u32, base_tick_upper_index_is_neg);
         let limit_lower_index = i32::from_u32_neg(limit_tick_lower_index_u32, limit_tick_lower_index_is_neg);
@@ -880,6 +886,7 @@ module turbos_assets_manage::vault {
         config::checked_package_version(global_config);
         assert!(strategy.status == 0, EStrategyLocked);
         assert!(limit > 0, EInvalidLimit);
+        assert!(is_vault_exists(strategy, current_vault_id), EInvalidVaultId);
 
         let rebalance_vaults = vector::empty();
         let rebalance_vaults_lenght = 0;
@@ -2774,6 +2781,13 @@ module turbos_assets_manage::vault {
     ): &VaultInfo {
         let vault_info = linked_table::borrow(&strategy.vaults, vault_id);
         vault_info
+    }
+
+    public fun  is_vault_exists(
+        strategy: &Strategy,
+        vault_id: ID,
+    ): bool {
+        linked_table::contains(&strategy.vaults, vault_id)
     }
 
     fun  remove_vault_info(
