@@ -1,0 +1,847 @@
+[NOTE] Dependencies on Sui, MoveStdlib, Bridge, DeepBook, and SuiSystem are automatically added, but this feature is disabled for your package because you have explicitly included dependencies on MoveStdlib and Sui. Consider removing these dependencies from `Move.toml`.
++-------------------------+
+| Move Coverage Summary   |
++-------------------------+
+Module 0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0::acl
+	fun add_role
+		total: 38
+		covered: 0
+		% coverage: 0.00
+	fun get_members
+		total: 39
+		covered: 0
+		% coverage: 0.00
+	fun get_permission
+		total: 19
+		covered: 0
+		% coverage: 0.00
+	fun has_role
+		total: 34
+		covered: 30
+		% coverage: 88.24
+	fun new
+		total: 4
+		covered: 4
+		% coverage: 100.00
+	fun remove_member
+		total: 14
+		covered: 0
+		% coverage: 0.00
+	fun remove_role
+		total: 35
+		covered: 29
+		% coverage: 82.86
+	fun set_roles
+		total: 18
+		covered: 18
+		% coverage: 100.00
+	fun unit_test_poison
+		total: 2
+		covered: 0
+		% coverage: 0.00
+>>> % Module coverage: 39.90
+Module 0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0::config
+	fun add_operator
+		total: 25
+		covered: 25
+		% coverage: 100.00
+	fun add_role
+		total: 13
+		covered: 0
+		% coverage: 0.00
+	fun check_rebalance_manager_role
+		total: 10
+		covered: 10
+		% coverage: 100.00
+	fun check_reward_manager_role
+		total: 10
+		covered: 10
+		% coverage: 100.00
+	fun check_vault_manager_role
+		total: 10
+		covered: 10
+		% coverage: 100.00
+	fun checked_package_version
+		total: 10
+		covered: 10
+		% coverage: 100.00
+	fun get_members
+		total: 4
+		covered: 0
+		% coverage: 0.00
+	fun get_tier
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun get_tier_v2
+		total: 30
+		covered: 0
+		% coverage: 0.00
+	fun init
+		total: 32
+		covered: 32
+		% coverage: 100.00
+	fun init_for_testing
+		total: 3
+		covered: 3
+		% coverage: 100.00
+	fun new_user_tier_config
+		total: 19
+		covered: 0
+		% coverage: 0.00
+	fun remove_member
+		total: 11
+		covered: 0
+		% coverage: 0.00
+	fun remove_role
+		total: 13
+		covered: 13
+		% coverage: 100.00
+	fun set_package_version
+		total: 22
+		covered: 22
+		% coverage: 100.00
+	fun set_roles
+		total: 13
+		covered: 13
+		% coverage: 100.00
+	fun set_tier
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun set_tier_v2
+		total: 52
+		covered: 0
+		% coverage: 0.00
+	fun unit_test_poison
+		total: 2
+		covered: 0
+		% coverage: 0.00
+>>> % Module coverage: 52.30
+Module 0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0::rewarder
+	fun accumulate_rewarder_released
+		total: 41
+		covered: 0
+		% coverage: 0.00
+	fun accumulate_strategy_reward
+		total: 74
+		covered: 0
+		% coverage: 0.00
+	fun accumulate_strategys_reward
+		total: 46
+		covered: 0
+		% coverage: 0.00
+	fun add_reward_black_list
+		total: 31
+		covered: 0
+		% coverage: 0.00
+	fun add_strategy
+		total: 69
+		covered: 0
+		% coverage: 0.00
+	fun create_rewarder
+		total: 52
+		covered: 0
+		% coverage: 0.00
+	fun deposit_rewarder
+		total: 44
+		covered: 0
+		% coverage: 0.00
+	fun init
+		total: 28
+		covered: 0
+		% coverage: 0.00
+	fun init_for_testing
+		total: 3
+		covered: 0
+		% coverage: 0.00
+	fun is_in_black_list
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun is_strategy_in_rewarder
+		total: 8
+		covered: 0
+		% coverage: 0.00
+	fun is_strategy_registered
+		total: 5
+		covered: 0
+		% coverage: 0.00
+	fun register_strategy
+		total: 19
+		covered: 0
+		% coverage: 0.00
+	fun remove_reward_black_list
+		total: 32
+		covered: 0
+		% coverage: 0.00
+	fun set_strategy_share
+		total: 9
+		covered: 0
+		% coverage: 0.00
+	fun strategy_rewards_settle
+		total: 61
+		covered: 0
+		% coverage: 0.00
+	fun unit_test_poison
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun update_rewarder
+		total: 47
+		covered: 0
+		% coverage: 0.00
+	fun withdraw_reward
+		total: 74
+		covered: 0
+		% coverage: 0.00
+>>> % Module coverage: 0.00
+Module 0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0::vault
+	fun add_rewarder
+		total: 47
+		covered: 0
+		% coverage: 0.00
+	fun borrow_clmm_base_nft
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun borrow_clmm_limit_nft
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun borrow_mut_clmm_base_nft
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun borrow_mut_clmm_limit_nft
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun borrow_mut_vault_account
+		total: 5
+		covered: 0
+		% coverage: 0.00
+	fun borrow_mut_vault_info
+		total: 5
+		covered: 0
+		% coverage: 0.00
+	fun borrow_vault_account
+		total: 5
+		covered: 0
+		% coverage: 0.00
+	fun borrow_vault_info
+		total: 5
+		covered: 0
+		% coverage: 0.00
+	fun burn_clmm_base_nft
+		total: 10
+		covered: 0
+		% coverage: 0.00
+	fun burn_clmm_limit_nft
+		total: 10
+		covered: 0
+		% coverage: 0.00
+	fun calculate_liquidity
+		total: 11
+		covered: 0
+		% coverage: 0.00
+	fun calculate_position_share
+		total: 88
+		covered: 0
+		% coverage: 0.00
+	fun calculate_tick_index
+		total: 29
+		covered: 29
+		% coverage: 100.00
+	fun check_rebalance
+		total: 212
+		covered: 0
+		% coverage: 0.00
+	fun check_rebalance_loop
+		total: 130
+		covered: 0
+		% coverage: 0.00
+	fun check_tick_range
+		total: 42
+		covered: 0
+		% coverage: 0.00
+	fun close_vault
+		total: 111
+		covered: 0
+		% coverage: 0.00
+	fun coin_to_vec
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_base_fees
+		total: 122
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_base_reward
+		total: 87
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_fees
+		total: 48
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_limit_fees
+		total: 122
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_limit_reward
+		total: 87
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_reward
+		total: 71
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_reward_direct_return
+		total: 153
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_reward_to_vault
+		total: 82
+		covered: 0
+		% coverage: 0.00
+	fun collect_protocol_fee
+		total: 31
+		covered: 0
+		% coverage: 0.00
+	fun collect_rebalance_fee
+		total: 57
+		covered: 0
+		% coverage: 0.00
+	fun collect_reward
+		total: 111
+		covered: 0
+		% coverage: 0.00
+	fun create_strategy
+		total: 109
+		covered: 0
+		% coverage: 0.00
+	fun decrease_clmm_liquidity
+		total: 15
+		covered: 0
+		% coverage: 0.00
+	fun deposit
+		total: 473
+		covered: 0
+		% coverage: 0.00
+	fun extract_clmm_base_nft
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun extract_clmm_limit_nft
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun fill_clmm_base_nft
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun fill_clmm_limit_nft
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun floor_tick_index
+		total: 45
+		covered: 45
+		% coverage: 100.00
+	fun get_check_rebalance_info
+		total: 19
+		covered: 0
+		% coverage: 0.00
+	fun get_management_fee_rate
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun get_management_fee_rate_v2
+		total: 49
+		covered: 0
+		% coverage: 0.00
+	fun get_performance_fee_rate
+		total: 25
+		covered: 0
+		% coverage: 0.00
+	fun get_strategy_status
+		total: 4
+		covered: 0
+		% coverage: 0.00
+	fun get_strategy_tick_spacing
+		total: 4
+		covered: 0
+		% coverage: 0.00
+	fun get_strategy_total_share
+		total: 4
+		covered: 0
+		% coverage: 0.00
+	fun get_type_name_str
+		total: 4
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_amount
+		total: 80
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_balance
+		total: 24
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_base_clmm_position_id
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_base_last_tick_index
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_base_liquidity
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_base_lower_index
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_base_tick_step
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_base_upper_index
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_info
+		total: 33
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_limit_clmm_position_id
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_limit_last_tick_index
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_limit_liquidity
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_limit_lower_index
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_limit_tick_step
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_limit_upper_index
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_share
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_sqrt_price
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun get_vault_total_amount
+		total: 23
+		covered: 0
+		% coverage: 0.00
+	fun increase_clmm_liquidity
+		total: 57
+		covered: 0
+		% coverage: 0.00
+	fun init
+		total: 85
+		covered: 0
+		% coverage: 0.00
+	fun init_account_balance
+		total: 10
+		covered: 0
+		% coverage: 0.00
+	fun init_for_testing
+		total: 5
+		covered: 0
+		% coverage: 0.00
+	fun is_clmm_base_nft_exists
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun is_clmm_limit_nft_exists
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun is_vault_exists
+		total: 5
+		covered: 0
+		% coverage: 0.00
+	fun merge_protocol_asset
+		total: 24
+		covered: 0
+		% coverage: 0.00
+	fun merge_vault_balance
+		total: 28
+		covered: 0
+		% coverage: 0.00
+	fun mint_clmm_liquidity
+		total: 33
+		covered: 0
+		% coverage: 0.00
+	fun open_vault
+		total: 258
+		covered: 0
+		% coverage: 0.00
+	fun rebalance
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun rebalance_with_fee
+		total: 790
+		covered: 0
+		% coverage: 0.00
+	fun remove_vault_info
+		total: 5
+		covered: 0
+		% coverage: 0.00
+	fun take_protocol_asset_by_amount
+		total: 32
+		covered: 0
+		% coverage: 0.00
+	fun take_vault_balance
+		total: 23
+		covered: 0
+		% coverage: 0.00
+	fun take_vault_balance_by_amount
+		total: 51
+		covered: 0
+		% coverage: 0.00
+	fun test_calculate_tick_index
+		total: 89
+		covered: 73
+		% coverage: 82.02
+	fun test_floor_tick_index
+		total: 163
+		covered: 139
+		% coverage: 85.28
+	fun unit_test_poison
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_base_minimum_threshold
+		total: 14
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_default_base_rebalance_threshold
+		total: 14
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_default_limit_rebalance_threshold
+		total: 14
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_image_url
+		total: 14
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_limit_minimum_threshold
+		total: 14
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_management_fee_rate
+		total: 34
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_performance_fee_rate
+		total: 34
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_reward_info
+		total: 107
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_status
+		total: 14
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_base_rebalance_threshold
+		total: 18
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_base_rebalance_threshold_by_owner
+		total: 15
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_info
+		total: 17
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_info_with_tick_range
+		total: 49
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_limit_rebalance_threshold
+		total: 18
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_limit_rebalance_threshold_by_owner
+		total: 15
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_management_fee_rate
+		total: 42
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_performance_fee_rate
+		total: 42
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_reward_info
+		total: 82
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_reward_info_on_claim
+		total: 26
+		covered: 0
+		% coverage: 0.00
+	fun vault_balance_amount
+		total: 24
+		covered: 0
+		% coverage: 0.00
+	fun withdraw
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun withdraw_v2
+		total: 465
+		covered: 0
+		% coverage: 0.00
+>>> % Module coverage: 5.20
+Module 0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0::router
+	fun add_operator
+		total: 7
+		covered: 7
+		% coverage: 100.00
+	fun add_role
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun close_vault
+		total: 6
+		covered: 0
+		% coverage: 0.00
+	fun collect_clmm_reward_direct_return
+		total: 15
+		covered: 0
+		% coverage: 0.00
+	fun collect_protocol_fee
+		total: 9
+		covered: 0
+		% coverage: 0.00
+	fun collect_reward
+		total: 10
+		covered: 0
+		% coverage: 0.00
+	fun create_strategy
+		total: 17
+		covered: 0
+		% coverage: 0.00
+	fun deposit
+		total: 13
+		covered: 0
+		% coverage: 0.00
+	fun new_user_tier_config
+		total: 4
+		covered: 0
+		% coverage: 0.00
+	fun open_vault
+		total: 18
+		covered: 0
+		% coverage: 0.00
+	fun open_vault_and_deposit
+		total: 55
+		covered: 0
+		% coverage: 0.00
+	fun rebalance
+		total: 22
+		covered: 0
+		% coverage: 0.00
+	fun remove_role
+		total: 6
+		covered: 6
+		% coverage: 100.00
+	fun set_package_version
+		total: 5
+		covered: 5
+		% coverage: 100.00
+	fun set_roles
+		total: 6
+		covered: 6
+		% coverage: 100.00
+	fun set_tier
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun set_tier_v2
+		total: 20
+		covered: 0
+		% coverage: 0.00
+	fun unit_test_poison
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_base_minimum_threshold
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_default_base_rebalance_threshold
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_default_limit_rebalance_threshold
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_limit_minimum_threshold
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_management_fee_rate
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_performance_fee_rate
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_strategy_status
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_base_rebalance_threshold
+		total: 8
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_base_rebalance_threshold_by_owner
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_limit_rebalance_threshold
+		total: 8
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_limit_rebalance_threshold_by_owner
+		total: 7
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_management_fee_rate
+		total: 8
+		covered: 0
+		% coverage: 0.00
+	fun update_vault_performance_fee_rate
+		total: 8
+		covered: 0
+		% coverage: 0.00
+	fun withdraw
+		total: 2
+		covered: 0
+		% coverage: 0.00
+	fun withdraw_v2
+		total: 20
+		covered: 0
+		% coverage: 0.00
+>>> % Module coverage: 7.06
+Module 0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0::reward_tests
+	fun prepare_tests
+		total: 229
+		covered: 0
+		% coverage: 0.00
+	fun test_reward
+		total: 507
+		covered: 0
+		% coverage: 0.00
+	fun unit_test_poison
+		total: 2
+		covered: 0
+		% coverage: 0.00
+>>> % Module coverage: 0.00
+Module 0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0::security_acl_tests
+	fun finish
+		total: 9
+		covered: 9
+		% coverage: 100.00
+	fun security_each_granted_role_passes_its_check
+		total: 23
+		covered: 23
+		% coverage: 100.00
+	fun security_future_version_blocks_acl_changes
+		total: 18
+		covered: 13
+		% coverage: 72.22
+	fun security_missing_rebalance_role_is_rejected
+		total: 12
+		covered: 7
+		% coverage: 58.33
+	fun security_missing_reward_role_is_rejected
+		total: 12
+		covered: 7
+		% coverage: 58.33
+	fun security_missing_vault_role_is_rejected
+		total: 12
+		covered: 7
+		% coverage: 58.33
+	fun security_operator_owner_address_does_not_inherit_cap_role
+		total: 19
+		covered: 14
+		% coverage: 73.68
+	fun security_operator_permissions_are_keyed_by_cap_id
+		total: 39
+		covered: 39
+		% coverage: 100.00
+	fun security_rebalance_only_does_not_grant_vault_management
+		total: 20
+		covered: 15
+		% coverage: 75.00
+	fun security_revoked_reward_role_is_rejected
+		total: 25
+		covered: 20
+		% coverage: 80.00
+	fun security_version_cannot_move_backwards
+		total: 13
+		covered: 8
+		% coverage: 61.54
+	fun security_zeroed_operator_cap_cannot_rebalance
+		total: 48
+		covered: 40
+		% coverage: 83.33
+	fun setup
+		total: 24
+		covered: 24
+		% coverage: 100.00
+	fun unit_test_poison
+		total: 2
+		covered: 0
+		% coverage: 0.00
+>>> % Module coverage: 81.88
+Module 0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0::vault_tests
+	fun prepare_tests
+		total: 308
+		covered: 0
+		% coverage: 0.00
+	fun test_vault_base
+		total: 909
+		covered: 0
+		% coverage: 0.00
+	fun unit_test_poison
+		total: 2
+		covered: 0
+		% coverage: 0.00
+>>> % Module coverage: 0.00
++-------------------------+
+| % Move Coverage: 8.31  |
++-------------------------+

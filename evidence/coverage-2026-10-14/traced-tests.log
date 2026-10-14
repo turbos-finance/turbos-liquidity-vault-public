@@ -1,0 +1,20 @@
+[NOTE] Dependencies on Sui, MoveStdlib, Bridge, DeepBook, and SuiSystem are automatically added, but this feature is disabled for your package because you have explicitly included dependencies on MoveStdlib and Sui. Consider removing these dependencies from `Move.toml`.
+INCLUDING DEPENDENCY MoveStdlib
+INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY TurbosCLMM
+BUILDING TurbosAssetsManage
+Running Move unit tests
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_each_granted_role_passes_its_check
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_future_version_blocks_acl_changes
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_missing_rebalance_role_is_rejected
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_missing_reward_role_is_rejected
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_missing_vault_role_is_rejected
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_operator_owner_address_does_not_inherit_cap_role
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_operator_permissions_are_keyed_by_cap_id
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_rebalance_only_does_not_grant_vault_management
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_revoked_reward_role_is_rejected
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_version_cannot_move_backwards
+[ PASS    ] turbos_assets_manage::security_acl_tests::security_zeroed_operator_cap_cannot_rebalance
+[ PASS    ] turbos_assets_manage::vault::test_calculate_tick_index
+[ PASS    ] turbos_assets_manage::vault::test_floor_tick_index
+Test result: OK. Total tests: 13; passed: 13; failed: 0

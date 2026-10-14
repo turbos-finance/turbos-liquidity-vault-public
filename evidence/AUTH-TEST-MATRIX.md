@@ -41,6 +41,7 @@ node reproduce.mjs /tmp/turbos-vault-security-tests test
 The path must not exist. Framework native functions are aligned with the CLI; VM test
 budget is 1,000,000,000, not a mainnet gas payment.
 
-No line/branch percentage is claimed: the installed CLI lacks tracing support.
-A tracing-enabled toolchain/coverage report and the complete every-auth/every-invariant
-matrix are still required. This evidence is progress on R10, not its closure.
+A separate official tracing-enabled CLI now supplies a
+[production-only coverage report](coverage-2026-10-14/README.md). Its precise full/partial
+tracing scope is disclosed there; this original passing test baseline remains unchanged.
+The complete every-auth/every-invariant matrix is still required. R10 is not closed.
