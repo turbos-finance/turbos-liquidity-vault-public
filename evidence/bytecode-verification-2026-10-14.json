@@ -1,0 +1,80 @@
+{
+  "verifiedAt": "2026-10-14T08:33:35.261Z",
+  "packageId": "0x0ca0dbe2da5ea7c7b0d0d0796e7918413f9328c4e4bf72e2f6bcd8bf3c993c45",
+  "originalId": "0x0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0",
+  "version": "8",
+  "comparison": "Exact byte-for-byte module BCS; no normalization or exceptions",
+  "allModulesMatch": true,
+  "modules": [
+    {
+      "module": "acl",
+      "present": true,
+      "match": true,
+      "builtBytes": 1256,
+      "deployedBytes": 1256,
+      "builtSha256": "52651e6e432a5a205a9a658ec84f63015a2b1e3475f313fb85299f0282229063",
+      "deployedSha256": "52651e6e432a5a205a9a658ec84f63015a2b1e3475f313fb85299f0282229063"
+    },
+    {
+      "module": "config",
+      "present": true,
+      "match": true,
+      "builtBytes": 2489,
+      "deployedBytes": 2489,
+      "builtSha256": "f62298e6078938148dfff56fe511ab637139757d50f6699fc98b1f3b4c4f3b47",
+      "deployedSha256": "f62298e6078938148dfff56fe511ab637139757d50f6699fc98b1f3b4c4f3b47"
+    },
+    {
+      "module": "rewarder",
+      "present": true,
+      "match": true,
+      "builtBytes": 4055,
+      "deployedBytes": 4055,
+      "builtSha256": "08ab830f24d1b889fc2d26f85d12264f1baba8331a06352c91ebb9bc59ec416a",
+      "deployedSha256": "08ab830f24d1b889fc2d26f85d12264f1baba8331a06352c91ebb9bc59ec416a"
+    },
+    {
+      "module": "router",
+      "present": true,
+      "match": true,
+      "builtBytes": 3310,
+      "deployedBytes": 3310,
+      "builtSha256": "dda996f132b122e3e519233f1516bdfa87027687e8d192be9ce99712583c3ad4",
+      "deployedSha256": "dda996f132b122e3e519233f1516bdfa87027687e8d192be9ce99712583c3ad4"
+    },
+    {
+      "module": "vault",
+      "present": true,
+      "match": true,
+      "builtBytes": 23554,
+      "deployedBytes": 23554,
+      "builtSha256": "9fdc9424db4f823415fc668d3a6e2dadb4f98217710261adc638727143e5c852",
+      "deployedSha256": "9fdc9424db4f823415fc668d3a6e2dadb4f98217710261adc638727143e5c852"
+    }
+  ],
+  "extra": [],
+  "linkage": [
+    {
+      "originalId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "upgradedId": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "upgradedVersion": "24"
+    },
+    {
+      "originalId": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "upgradedId": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "upgradedVersion": "53"
+    },
+    {
+      "originalId": "0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1",
+      "upgradedId": "0xa5a0c25c79e428eba04fb98b3fb2a34db45ab26d4c8faf0d7e39d66a63891e64",
+      "upgradedVersion": "22"
+    }
+  ],
+  "sourceCommit": "5a2996c38c7be786ec3cf943a7b3f5358b17b79d",
+  "sourceRepository": "https://github.com/turbos-finance/turbos-liquidity-vault-public",
+  "toolchain": "sui 1.66.2-a9a6825eaf62 (Darwin arm64)",
+  "frameworkCommit": "25804c243d07dd73c0d199e7794383bd855cd436",
+  "sourceAndExistingTestsUnchanged": true,
+  "scope": "All root-package module BCS bytes only. The included on-chain linkage is recorded, not independently compared. This is not a complete verify-source, security audit, coverage report, or mvr-add consumer test.",
+  "manifestRecipe": "tools/repro/root.Move.toml"
+}

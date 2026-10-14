@@ -1,0 +1,10 @@
+[package]
+name = "TurbosCLMM"
+version = "0.1.4"
+published-at = "0xd02012c71c1a6a221e540c36c37c81e0224907fe1ee05bfe250025654ff17103"
+
+[dependencies]
+Sui = { local = "../../framework/crates/sui-framework/packages/sui-framework", override = true }
+
+[addresses]
+turbos_clmm = "0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1"

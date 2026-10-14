@@ -1,0 +1,11 @@
+{
+  "name": "turbos-vault-release-repro",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@mysten/sui": "2.22.1"
+  }
+}

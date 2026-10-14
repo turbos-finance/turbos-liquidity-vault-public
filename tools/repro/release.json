@@ -1,0 +1,11 @@
+{
+  "project": "vault",
+  "repository": "https://github.com/turbos-finance/turbos-liquidity-vault-public",
+  "sourceCommit": "5a2996c38c7be786ec3cf943a7b3f5358b17b79d",
+  "packageId": "0x0ca0dbe2da5ea7c7b0d0d0796e7918413f9328c4e4bf72e2f6bcd8bf3c993c45",
+  "packageName": "TurbosAssetsManage",
+  "version": 8,
+  "frameworkLegacy": "25804c243d07dd73c0d199e7794383bd855cd436",
+  "frameworkCurrent": "a9a6825eaf6273cc819ee3bcf65fd4909f7624a9",
+  "interfaceCommit": "2d4b90af960d82f9ea0652747059d78d843a958c"
+}
