@@ -1,0 +1,15 @@
+{
+  "project": "vault",
+  "reports": [
+    {
+      "file": "audits/movebit-vault-2024.pdf",
+      "sha256": "425ad7a60aff8f9df66f6d10eb5b68734fe910d1cdfe7cb7d6938e36cc0faafa",
+      "bytes": 320860
+    },
+    {
+      "file": "audits/ottersec-vault-2024.pdf",
+      "sha256": "ed076326da0a6c94fb0512647f2028a21094556492836a23da3e369cfc8d5306",
+      "bytes": 1050254
+    }
+  ]
+}

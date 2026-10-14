@@ -1,0 +1,51 @@
+{
+  "project": "vault",
+  "packageId": "0x0ca0dbe2da5ea7c7b0d0d0796e7918413f9328c4e4bf72e2f6bcd8bf3c993c45",
+  "version": 8,
+  "originalRevision": "5a2996c38c7be786ec3cf943a7b3f5358b17b79d",
+  "contractAndTestFilesUnchanged": true,
+  "files": [
+    {
+      "path": "sources/acl.move",
+      "gitBlob": "e82783aefe0996ee72b073409680a276bbdee9c0",
+      "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96",
+      "bytes": 3361
+    },
+    {
+      "path": "sources/config.move",
+      "gitBlob": "4f4fbde8f183da124c530e4fc9061670e31f15d4",
+      "sha256": "09d346735d17e6b3dbbc19222c7a65741bca9929b361523bea21c3266993db1b",
+      "bytes": 8051
+    },
+    {
+      "path": "sources/rewarder.move",
+      "gitBlob": "7c5319063bc7f749590dcfc817c48cd790aabdb6",
+      "sha256": "ae8a9e156c23733be70f70fef64fd82df661937c3c65ec2705fa2dd3c07e0bb4",
+      "bytes": 15088
+    },
+    {
+      "path": "sources/router.move",
+      "gitBlob": "38dc12a78f4ef32cce239a3ed6862f0de048eac6",
+      "sha256": "4302b610bf1e896ec9258a024a205b0a08de587b948b70ea188a6b3e03377fb9",
+      "bytes": 18095
+    },
+    {
+      "path": "sources/vault.move",
+      "gitBlob": "602f3ca6c9539eac8f3638e367bdd461cd1e10c3",
+      "sha256": "ad737bff55520cae454400c0de7ac89244be457268fa496b5a62a7009df17cb0",
+      "bytes": 117137
+    },
+    {
+      "path": "tests/reward_tests.move",
+      "gitBlob": "9ae2e44923becca7ba7f66f110d8045b3d3625dc",
+      "sha256": "f827d1e91959a30967d2d415c107350e1b143a244cd3e2eeed0a32743f460c04",
+      "bytes": 20110
+    },
+    {
+      "path": "tests/vault_tests.move",
+      "gitBlob": "2a0c8027ed45920d561067495fe9cdf3e375b33d",
+      "sha256": "53637b2333db5ee554b84e91ba3ef28d8f1a51d8b84af8f0b1ba87fb473db41d",
+      "bytes": 30015
+    }
+  ]
+}

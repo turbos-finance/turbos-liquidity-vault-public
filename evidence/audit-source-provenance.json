@@ -1,0 +1,282 @@
+{
+  "project": "vault",
+  "anchors": [
+    {
+      "originalRevision": "edb2c6d52c3fd068be9c60e573fa322f341e1932",
+      "publication": "https://github.com/turbos-finance/turbos-liquidity-vault-public/tree/edb2c6d52c3fd068be9c60e573fa322f341e1932",
+      "files": [
+        {
+          "path": "sources/acl.move",
+          "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96",
+          "gitBlob": "e82783aefe0996ee72b073409680a276bbdee9c0"
+        },
+        {
+          "path": "sources/config.move",
+          "sha256": "96c3da5a00732102d7c3084c4f1ca1f54c40727628529d10fbcf8c8093a7f6a2",
+          "gitBlob": "1eb7794f80a2c68972d3b3db9644dfdb720f3bc0"
+        },
+        {
+          "path": "sources/rewarder.move",
+          "sha256": "32f0b90d78e1ffac726ad938f46006b2b613c450cc3f91abe07d62e27349729e",
+          "gitBlob": "ebfdeb51d12565b82e6664ed1519ab0540cc2e61"
+        },
+        {
+          "path": "sources/router.move",
+          "sha256": "82a1a380db5f366fdd34e1905ad7d5e441593bf923c12b644f1b865f6284e962",
+          "gitBlob": "c70bbc3f61c54f5dd79d8f3575c56aeb25ed2c31"
+        },
+        {
+          "path": "sources/vault.move",
+          "sha256": "8dbeea4f154aef99fd6f9b3464ec3d52a680a1fb451f89a0bdf602be68a464ae",
+          "gitBlob": "09d41eacb635f33f1e58e8e142dc9a517e2bc166"
+        }
+      ]
+    },
+    {
+      "originalRevision": "bdcf75f76d8dbeb849ad3189cc0743aebda08f8b",
+      "publication": "https://github.com/turbos-finance/turbos-liquidity-vault-public/tree/bdcf75f76d8dbeb849ad3189cc0743aebda08f8b",
+      "files": [
+        {
+          "path": "sources/acl.move",
+          "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96",
+          "gitBlob": "e82783aefe0996ee72b073409680a276bbdee9c0"
+        },
+        {
+          "path": "sources/config.move",
+          "sha256": "5f4cf0de164a0c13d46bd68de883ea908485bcc897573db835bcaea27de9e64b",
+          "gitBlob": "0e203c86b9a43fb796e54358756306ccd3ba9d98"
+        },
+        {
+          "path": "sources/rewarder.move",
+          "sha256": "31f8b9ca40d07e6dee08d55ff6c3c526643136b4182630610a3c75df9e197e1f",
+          "gitBlob": "5ae5c7b81f59403946604d7301342158bdeef997"
+        },
+        {
+          "path": "sources/router.move",
+          "sha256": "35cb4c9786357363595c3ff4f4f3e37cc1c8deedb1ecb9569866c8aafca87b79",
+          "gitBlob": "6cb99e46e2ed5c8d1f097ecdfb8f8c1576ecdc35"
+        },
+        {
+          "path": "sources/vault.move",
+          "sha256": "484fc6c720903779aa9434c346dc63afcfa28861cd951658f0503af1daf09b80",
+          "gitBlob": "7ab514d7a1444f87225aa4074ac3f50df983db64"
+        },
+        {
+          "path": "tests/reward_tests.move",
+          "sha256": "f827d1e91959a30967d2d415c107350e1b143a244cd3e2eeed0a32743f460c04",
+          "gitBlob": "9ae2e44923becca7ba7f66f110d8045b3d3625dc"
+        },
+        {
+          "path": "tests/vault_tests.move",
+          "sha256": "0d1cdd5c2cd7c2e832a22314b659003375d9b6b975802e9e86a7f2bbe25ca064",
+          "gitBlob": "87d3d9ce5f9bdd139db6b92bb6d6a330f00ce0fd"
+        }
+      ]
+    },
+    {
+      "originalRevision": "dfcccaec31f0a18a6bdbdccd928e22a06db5115e",
+      "publication": "https://github.com/turbos-finance/turbos-liquidity-vault-public/tree/dfcccaec31f0a18a6bdbdccd928e22a06db5115e",
+      "files": [
+        {
+          "path": "sources/acl.move",
+          "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96",
+          "gitBlob": "e82783aefe0996ee72b073409680a276bbdee9c0"
+        },
+        {
+          "path": "sources/config.move",
+          "sha256": "5f4cf0de164a0c13d46bd68de883ea908485bcc897573db835bcaea27de9e64b",
+          "gitBlob": "0e203c86b9a43fb796e54358756306ccd3ba9d98"
+        },
+        {
+          "path": "sources/rewarder.move",
+          "sha256": "31f8b9ca40d07e6dee08d55ff6c3c526643136b4182630610a3c75df9e197e1f",
+          "gitBlob": "5ae5c7b81f59403946604d7301342158bdeef997"
+        },
+        {
+          "path": "sources/router.move",
+          "sha256": "35cb4c9786357363595c3ff4f4f3e37cc1c8deedb1ecb9569866c8aafca87b79",
+          "gitBlob": "6cb99e46e2ed5c8d1f097ecdfb8f8c1576ecdc35"
+        },
+        {
+          "path": "sources/vault.move",
+          "sha256": "49a86a9fc59619c37721c53fa4be78ebec5b2046a716e87aae5c52b38e7adfa1",
+          "gitBlob": "e9ee8938dd8ebb0be915ae3800f3c88cf12cd0aa"
+        },
+        {
+          "path": "tests/reward_tests.move",
+          "sha256": "f827d1e91959a30967d2d415c107350e1b143a244cd3e2eeed0a32743f460c04",
+          "gitBlob": "9ae2e44923becca7ba7f66f110d8045b3d3625dc"
+        },
+        {
+          "path": "tests/vault_tests.move",
+          "sha256": "0d1cdd5c2cd7c2e832a22314b659003375d9b6b975802e9e86a7f2bbe25ca064",
+          "gitBlob": "87d3d9ce5f9bdd139db6b92bb6d6a330f00ce0fd"
+        }
+      ]
+    },
+    {
+      "originalRevision": "0a6d72c85c03474dcfea9fa4272fdbe45e6d3ab3",
+      "publication": "https://github.com/turbos-finance/turbos-liquidity-vault-public/tree/0a6d72c85c03474dcfea9fa4272fdbe45e6d3ab3",
+      "files": [
+        {
+          "path": "sources/acl.move",
+          "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96",
+          "gitBlob": "e82783aefe0996ee72b073409680a276bbdee9c0"
+        },
+        {
+          "path": "sources/config.move",
+          "sha256": "5f4cf0de164a0c13d46bd68de883ea908485bcc897573db835bcaea27de9e64b",
+          "gitBlob": "0e203c86b9a43fb796e54358756306ccd3ba9d98"
+        },
+        {
+          "path": "sources/rewarder.move",
+          "sha256": "31f8b9ca40d07e6dee08d55ff6c3c526643136b4182630610a3c75df9e197e1f",
+          "gitBlob": "5ae5c7b81f59403946604d7301342158bdeef997"
+        },
+        {
+          "path": "sources/router.move",
+          "sha256": "35cb4c9786357363595c3ff4f4f3e37cc1c8deedb1ecb9569866c8aafca87b79",
+          "gitBlob": "6cb99e46e2ed5c8d1f097ecdfb8f8c1576ecdc35"
+        },
+        {
+          "path": "sources/vault.move",
+          "sha256": "d0d32062112f62e459de0de369eff95e16d4032239f8845779dd8a96a0bd39bd",
+          "gitBlob": "82adb94040097b6e615ae6afb189b0904e4e59c4"
+        },
+        {
+          "path": "tests/reward_tests.move",
+          "sha256": "f827d1e91959a30967d2d415c107350e1b143a244cd3e2eeed0a32743f460c04",
+          "gitBlob": "9ae2e44923becca7ba7f66f110d8045b3d3625dc"
+        },
+        {
+          "path": "tests/vault_tests.move",
+          "sha256": "b1148014bf894aed933671603bbe6803ada883478df3de3053e43cdb4f678a73",
+          "gitBlob": "420605cb95d678babad496ec59dc23ccc8a8f06a"
+        }
+      ]
+    },
+    {
+      "originalRevision": "5ed709644441c794eea8ebb1fa2c900d6f84d8a5",
+      "publication": "https://github.com/turbos-finance/turbos-liquidity-vault-public/tree/5ed709644441c794eea8ebb1fa2c900d6f84d8a5",
+      "files": [
+        {
+          "path": "sources/acl.move",
+          "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96",
+          "gitBlob": "e82783aefe0996ee72b073409680a276bbdee9c0"
+        },
+        {
+          "path": "sources/config.move",
+          "sha256": "822e069ab9bcf5f5a0cf48aed72980f9a3890212c9eb5b9665c36660c52d0cf1",
+          "gitBlob": "384337e38c81df7949eaf5c42616d3cce788c3fd"
+        },
+        {
+          "path": "sources/rewarder.move",
+          "sha256": "31f8b9ca40d07e6dee08d55ff6c3c526643136b4182630610a3c75df9e197e1f",
+          "gitBlob": "5ae5c7b81f59403946604d7301342158bdeef997"
+        },
+        {
+          "path": "sources/router.move",
+          "sha256": "a1120f740565d4f90634cf30793a7f7abc076aa5d3502e8f9e9b93abd290a160",
+          "gitBlob": "495197fdc88ddb6ab229efb2ce30c334332023bd"
+        },
+        {
+          "path": "sources/vault.move",
+          "sha256": "29f4f2953216468ebd5c5f3ae805d07e9769385eb81e1e751a58dc751302745c",
+          "gitBlob": "11fb0bdd148886c79d1bcda02403f403f2f2aedb"
+        },
+        {
+          "path": "tests/reward_tests.move",
+          "sha256": "f827d1e91959a30967d2d415c107350e1b143a244cd3e2eeed0a32743f460c04",
+          "gitBlob": "9ae2e44923becca7ba7f66f110d8045b3d3625dc"
+        },
+        {
+          "path": "tests/vault_tests.move",
+          "sha256": "b1148014bf894aed933671603bbe6803ada883478df3de3053e43cdb4f678a73",
+          "gitBlob": "420605cb95d678babad496ec59dc23ccc8a8f06a"
+        }
+      ]
+    },
+    {
+      "originalRevision": "9333ce4f8e2d548ea4c46b7f08ac03f7d43b0244",
+      "publication": "https://github.com/turbos-finance/turbos-liquidity-vault-public/tree/9333ce4f8e2d548ea4c46b7f08ac03f7d43b0244",
+      "files": [
+        {
+          "path": "sources/acl.move",
+          "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96",
+          "gitBlob": "e82783aefe0996ee72b073409680a276bbdee9c0"
+        },
+        {
+          "path": "sources/config.move",
+          "sha256": "d76e5f90bcbd66453ec40b4c28354ec4681c8d687f158c31fdf21878eca3e4a1",
+          "gitBlob": "ed4e8dc3c9c02087268ac640d4bb62bbfa1ab60a"
+        },
+        {
+          "path": "sources/rewarder.move",
+          "sha256": "ae8a9e156c23733be70f70fef64fd82df661937c3c65ec2705fa2dd3c07e0bb4",
+          "gitBlob": "7c5319063bc7f749590dcfc817c48cd790aabdb6"
+        },
+        {
+          "path": "sources/router.move",
+          "sha256": "4302b610bf1e896ec9258a024a205b0a08de587b948b70ea188a6b3e03377fb9",
+          "gitBlob": "38dc12a78f4ef32cce239a3ed6862f0de048eac6"
+        },
+        {
+          "path": "sources/vault.move",
+          "sha256": "24f0829ff42457cf707201bf251b179d91adae262e25bdb78bcaef828dc34344",
+          "gitBlob": "e68dfdcc5e678ab57220aa462f1dbf8f0765be50"
+        },
+        {
+          "path": "tests/reward_tests.move",
+          "sha256": "f827d1e91959a30967d2d415c107350e1b143a244cd3e2eeed0a32743f460c04",
+          "gitBlob": "9ae2e44923becca7ba7f66f110d8045b3d3625dc"
+        },
+        {
+          "path": "tests/vault_tests.move",
+          "sha256": "53637b2333db5ee554b84e91ba3ef28d8f1a51d8b84af8f0b1ba87fb473db41d",
+          "gitBlob": "2a0c8027ed45920d561067495fe9cdf3e375b33d"
+        }
+      ]
+    },
+    {
+      "originalRevision": "971cfd9d02ef33bad180d64b697be9e7a4c717a3",
+      "publication": "https://github.com/turbos-finance/turbos-liquidity-vault-public/tree/971cfd9d02ef33bad180d64b697be9e7a4c717a3",
+      "files": [
+        {
+          "path": "sources/acl.move",
+          "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96",
+          "gitBlob": "e82783aefe0996ee72b073409680a276bbdee9c0"
+        },
+        {
+          "path": "sources/config.move",
+          "sha256": "6cbe28f4c79d3b8dc11a6185c5cb47508dabc20e3b1ca6a2679363d58804613c",
+          "gitBlob": "842a85e046ff36dc102d823e552ff09c33bb65db"
+        },
+        {
+          "path": "sources/rewarder.move",
+          "sha256": "ae8a9e156c23733be70f70fef64fd82df661937c3c65ec2705fa2dd3c07e0bb4",
+          "gitBlob": "7c5319063bc7f749590dcfc817c48cd790aabdb6"
+        },
+        {
+          "path": "sources/router.move",
+          "sha256": "1a65f90c6b271f604fccfd3fd63525167612c065a7c14634c0ceed411c5c79db",
+          "gitBlob": "ac1d0a265bb97636a240e384b8e0f2b8ff7f8440"
+        },
+        {
+          "path": "sources/vault.move",
+          "sha256": "5675cb837e512062ea66081142d4cc667e5c52dc1f1967c3361fd7c7fce4b791",
+          "gitBlob": "6e8ae26c6e8c86bb06120a7d0b9a0fff071b5f00"
+        },
+        {
+          "path": "tests/reward_tests.move",
+          "sha256": "f827d1e91959a30967d2d415c107350e1b143a244cd3e2eeed0a32743f460c04",
+          "gitBlob": "9ae2e44923becca7ba7f66f110d8045b3d3625dc"
+        },
+        {
+          "path": "tests/vault_tests.move",
+          "sha256": "53637b2333db5ee554b84e91ba3ef28d8f1a51d8b84af8f0b1ba87fb473db41d",
+          "gitBlob": "2a0c8027ed45920d561067495fe9cdf3e375b33d"
+        }
+      ]
+    }
+  ]
+}
