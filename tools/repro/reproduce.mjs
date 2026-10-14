@@ -10,7 +10,6 @@ const [destination, mode = 'build'] = process.argv.slice(2);
 if (!destination || !['build', 'test'].includes(mode)) {
   throw new Error('Usage: node reproduce.mjs NEW_WORKSPACE [build|test]');
 }
-if (mode === 'test' && config.project !== 'clmm') throw new Error('This published test recipe currently covers CLMM only.');
 const root = path.resolve(destination);
 if (fs.existsSync(root)) throw new Error('Workspace must not exist; refusing to overwrite.');
 const cliVersion = execFileSync('sui', ['--version'], { encoding: 'utf8' }).trim();
@@ -52,20 +51,32 @@ function manifest(dir, filename) {
   if (fs.existsSync(path.join(dir, 'Published.toml'))) fs.renameSync(path.join(dir, 'Published.toml'), path.join(dir, 'Published.toml.original'));
 }
 manifest(release, mode === 'test' ? 'test.Move.toml' : 'root.Move.toml');
-if (config.project === 'vault') {
+if (config.project === 'vault' && mode === 'build') {
   clone('https://github.com/turbos-finance/turbos-sui-move-interface.git', config.interfaceCommit, 'interface');
   remember(path.join(root, 'interface/clmm'));
   manifest(path.join(root, 'interface/clmm'), 'interface.Move.toml');
 }
-if (config.project === 'farming') {
+if (config.project === 'farming' || (config.project === 'vault' && mode === 'test')) {
   const clmm = clone('https://github.com/turbos-finance/turbos-clmm-public.git', config.clmmCommit, 'clmm');
   remember(clmm);
-  manifest(clmm, 'clmm.Move.toml');
+  manifest(clmm, mode === 'test' ? 'clmm-test.Move.toml' : 'clmm.Move.toml');
   // The historical V4 lock is superseded by explicitly pinned local dependencies.
   if (fs.existsSync(path.join(release, 'Move.lock'))) fs.renameSync(path.join(release, 'Move.lock'), path.join(release, 'Move.lock.original'));
 }
 for (const [p, before] of preserved) if (!before.equals(fs.readFileSync(p))) throw new Error(`Source/test changed: ${p}`);
 if (mode === 'test') {
+  if (fs.existsSync(path.join(release, 'Move.lock'))) fs.renameSync(path.join(release, 'Move.lock'), path.join(release, 'Move.lock.original'));
+  const overlay = path.join(here, 'test-overlay.patch');
+  if (fs.existsSync(overlay)) {
+    run('git', ['apply', '--check', overlay], release);
+    run('git', ['apply', overlay], release);
+  }
+  const extraTests = path.join(here, 'test-files');
+  if (fs.existsSync(extraTests)) fs.cpSync(extraTests, path.join(release, 'tests'), { recursive: true });
+  // Guard the explicit, reviewed test overlay against any changes during execution.
+  // The build mode above never applies it; exact mainnet bytecode verification is separate.
+  preserved.clear();
+  remember(release);
   run('sui', ['move', 'test', '--path', release, '--silence-warnings', '--no-lint', '--statistics', '--gas-limit', '1000000000']);
 } else {
   run('sui', ['move', 'build', '--path', release, '--silence-warnings']);

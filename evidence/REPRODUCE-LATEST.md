@@ -45,4 +45,11 @@ a useful additional check.
 
 A fresh test run/coverage report for this project is not part of this bytecode evidence.
 
+## Additional security test batch
+
+The test mode now runs the explicit test overlay described in
+[AUTH-TEST-MATRIX.md](AUTH-TEST-MATRIX.md): **15 passed, 0 failed**.
+Older baseline statements above describe the earlier run, not the current expanded suite.
+Production build mode remains unchanged and does not apply the test overlay.
+
 Historical GitInfo is deferred while latest-release evidence is prioritized.

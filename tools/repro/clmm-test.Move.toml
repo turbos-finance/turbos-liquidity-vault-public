@@ -1,0 +1,11 @@
+[package]
+name = "TurbosCLMM"
+version = "0.1.8"
+published-at = "0xa5a0c25c79e428eba04fb98b3fb2a34db45ab26d4c8faf0d7e39d66a63891e64"
+
+[dependencies]
+Sui = { local = "../framework-current/crates/sui-framework/packages/sui-framework" }
+MoveStdlib = { local = "../framework-current/crates/sui-framework/packages/move-stdlib" }
+
+[addresses]
+turbos_clmm = "0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1"

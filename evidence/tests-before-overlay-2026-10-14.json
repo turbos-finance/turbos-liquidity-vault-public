@@ -1,0 +1,16 @@
+{
+  "exitCode": 1,
+  "gasLimit": "1000000000",
+  "testResult": {
+    "status": "FAILED",
+    "total": 4,
+    "passed": 2,
+    "failed": 2
+  },
+  "failedTests": [
+    "turbos_assets_manage::reward_tests::test_reward",
+    "turbos_assets_manage::vault_tests::test_vault_base"
+  ],
+  "missingDependency": false,
+  "scope": "Original Vault tests with full CLMM v22 test dependency, before version-fixture correction"
+}

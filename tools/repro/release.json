@@ -7,5 +7,6 @@
   "version": 8,
   "frameworkLegacy": "25804c243d07dd73c0d199e7794383bd855cd436",
   "frameworkCurrent": "a9a6825eaf6273cc819ee3bcf65fd4909f7624a9",
-  "interfaceCommit": "2d4b90af960d82f9ea0652747059d78d843a958c"
+  "interfaceCommit": "2d4b90af960d82f9ea0652747059d78d843a958c",
+  "clmmCommit": "a02c7a0b78d8a53bb0534835c309b2d115254e01"
 }

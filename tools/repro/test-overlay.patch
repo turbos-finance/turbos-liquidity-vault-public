@@ -1,0 +1,38 @@
+diff --git a/tests/reward_tests.move b/tests/reward_tests.move
+index 9ae2e44..2d95533 100644
+--- a/tests/reward_tests.move
++++ b/tests/reward_tests.move
+@@ -167,6 +167,7 @@ module turbos_assets_manage::reward_tests {
+             let admin_cap = test_scenario::take_from_sender<AdminCap>(scenario);
+             let global_config = test_scenario::take_shared<GlobalConfig>(scenario);
+ 
++            router::set_package_version(&admin_cap, &mut global_config, 4);
+             router::add_operator(
+                 &admin_cap, 
+                 &mut global_config, 
+@@ -525,4 +526,4 @@ module turbos_assets_manage::reward_tests {
+ 
+         test_scenario::end(scenario_val);
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/tests/vault_tests.move b/tests/vault_tests.move
+index 2a0c802..133de02 100644
+--- a/tests/vault_tests.move
++++ b/tests/vault_tests.move
+@@ -175,6 +175,7 @@ module turbos_assets_manage::vault_tests {
+             let admin_cap = test_scenario::take_from_sender<AdminCap>(scenario);
+             let global_config = test_scenario::take_shared<GlobalConfig>(scenario);
+ 
++            router::set_package_version(&admin_cap, &mut global_config, 4);
+             router::add_operator(
+                 &admin_cap, 
+                 &mut global_config, 
+@@ -742,4 +743,4 @@ module turbos_assets_manage::vault_tests {
+ 
+         test_scenario::end(scenario_val);
+     }
+-}
+\ No newline at end of file
++}

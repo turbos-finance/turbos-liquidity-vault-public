@@ -1,0 +1,23 @@
+{
+  "exitCode": 0,
+  "gasLimit": "1000000000",
+  "testResult": {
+    "status": "OK",
+    "total": 15,
+    "passed": 15,
+    "failed": 0
+  },
+  "failedTests": [],
+  "missingDependency": false,
+  "date": "2026-10-14",
+  "sourceCommit": "5a2996c38c7be786ec3cf943a7b3f5358b17b79d",
+  "packageId": "0x0ca0dbe2da5ea7c7b0d0d0796e7918413f9328c4e4bf72e2f6bcd8bf3c993c45",
+  "toolchain": "sui 1.66.2-a9a6825eaf62 (Darwin arm64)",
+  "testFrameworkCommit": "a9a6825eaf6273cc819ee3bcf65fd4909f7624a9",
+  "testOverlayApplied": true,
+  "modifications": "Runs against full public CLMM v22 instead of the interface-only dependency, which lacks test fixtures. Two legacy fixture setups advance GlobalConfig from initial version 1 to deployed code version 4 through the existing authorized setter. Adds 11 role, revocation, version and OperatorCap-ID tests. No production source change.",
+  "productionLogicChanged": false,
+  "coverageGenerated": false,
+  "coverageLimitation": "Installed CLI lacks tracing support; no line or branch coverage measured.",
+  "exhaustiveAuthorizationCoverage": false
+}
