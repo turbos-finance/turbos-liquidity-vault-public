@@ -1,5 +1,8 @@
 # Audit evidence - Turbos Liquidity Vault
 
+Audit PDFs retain their original authors' copyright and terms. The repository's MIT
+license applies to Turbos-owned source and documentation; it does not relicense third-party reports.
+
 Original reports are preserved: [MoveBit](movebit-vault-2024.pdf) and
 [OtterSec](ottersec-vault-2024.pdf).
 
