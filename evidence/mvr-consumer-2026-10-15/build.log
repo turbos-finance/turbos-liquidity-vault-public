@@ -1,0 +1,10 @@
+Output from mvr:
+  │ [mvr] detected supported SUI CLI version
+  │ [mvr] resolving: "@turbos/vault/8" on network:  mainnet
+
+Downloading from https://github.com/turbos-finance/turbos-clmm-public.git
+INCLUDING DEPENDENCY MoveStdlib
+INCLUDING DEPENDENCY Sui
+INCLUDING DEPENDENCY TurbosAssetsManage
+INCLUDING DEPENDENCY TurbosCLMM
+BUILDING PublicConsumervault

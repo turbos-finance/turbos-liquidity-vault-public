@@ -42,3 +42,7 @@ with a compatible node/toolchain is still needed. Coverage reports remain outsta
 ## Current-release metadata verification (2026-10-15)
 
 See [verified build configuration and official source-verification evidence](evidence/mvr-source-2026-10-15/README.md). This update does not change production functions. MVR GitInfo update and a fresh-cache registry-consumer run are separate follow-ups.
+
+## Public MVR consumer result (2026-10-15)
+
+The owner executed the current-version GitInfo update. The official MVR add and a real-import consumer build both passed using a new empty cache for the validation run. See [consumer logs, manifest, lockfile and results](evidence/mvr-consumer-2026-10-15/README.md). This supersedes the earlier metadata-update-pending status, without changing the source commit recorded in MVR.

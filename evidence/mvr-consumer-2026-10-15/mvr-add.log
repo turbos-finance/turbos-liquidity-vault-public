@@ -1,0 +1,6 @@
+[mvr] detected supported SUI CLI version
+
+Successfully added dependency @turbos/vault/8 to your Move.toml
+
+You can use this dependency in your modules by calling: use turbos_assets_manage::<module>;
+

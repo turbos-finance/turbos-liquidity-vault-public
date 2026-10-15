@@ -1,0 +1,8 @@
+[package]
+name = "PublicConsumervault"
+edition = "2024"
+[addresses]
+consumer = "0x0"
+
+[dependencies]
+turbos_assets_manage = { r.mvr = "@turbos/vault/8" }

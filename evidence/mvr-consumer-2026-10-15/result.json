@@ -1,0 +1,82 @@
+{
+  "completedAt": "2026-10-15T07:34:30.953Z",
+  "project": "vault",
+  "network": "mainnet",
+  "mvrName": "@turbos/vault",
+  "version": 8,
+  "packageId": "0x0ca0dbe2da5ea7c7b0d0d0796e7918413f9328c4e4bf72e2f6bcd8bf3c993c45",
+  "sourceCommit": "5c42e1b6626828dcdb697248b386e6931d57c07f",
+  "registryIndexedCorrectCommit": true,
+  "versionedRegistry": {
+    "name": "@turbos/vault",
+    "metadata": {
+      "contact": "ted@turbos.finance; bruce@turbos.finance",
+      "description": "Turbos Liquidity Vault",
+      "homepage_url": "https://app.turbos.finance",
+      "documentation_url": "https://github.com/turbos-finance/turbos-liquidity-vault-public/blob/main/README.md"
+    },
+    "package_info": {
+      "id": "0xe98f19ea668f9b681be2eda2492a8bbe40c850e510ef54e53bf3c75b76e7b219",
+      "git_table_id": "0x17db6facdec63070088ba64815d6e305cdab996ec1b20abf3ee15ec309adcef3",
+      "default_name": "@turbos/vault",
+      "metadata": {
+        "default": "@turbos/vault"
+      }
+    },
+    "git_info": {
+      "repository_url": "https://github.com/turbos-finance/turbos-liquidity-vault-public",
+      "path": "",
+      "tag": "5c42e1b6626828dcdb697248b386e6931d57c07f"
+    },
+    "version": 8,
+    "package_address": "0x0ca0dbe2da5ea7c7b0d0d0796e7918413f9328c4e4bf72e2f6bcd8bf3c993c45"
+  },
+  "latestRegistryAlsoMatches": true,
+  "metadataUpdate": {
+    "digest": "8d2nzwYgTTizbn1QBAydvj8jnjd4ViqsQWMd9eoBfdcY",
+    "sender": "0x6d92d887ba0858d58979fd88bbe91d4baf5ed473acc30804463608ef5d12697f",
+    "success": true,
+    "proposalCommandsAndInputsMatch": true
+  },
+  "toolchain": "sui 1.66.2-a9a6825eaf62",
+  "resolver": "mvr 0.1.0-d85f8ad92add",
+  "cacheScope": "A new empty MOVE_HOME was created for this five-package run; dependencies downloaded normally and were shared between its consumers. No old Move cache was seeded or edited.",
+  "nonEmptyImport": true,
+  "checks": [
+    {
+      "label": "vault-mvr-add",
+      "start": "2026-10-15T07:31:50.007Z",
+      "end": "2026-10-15T07:31:55.987Z",
+      "command": [
+        "mvr",
+        "add",
+        "@turbos/vault/8"
+      ],
+      "exitCode": 0
+    },
+    {
+      "label": "vault-build",
+      "start": "2026-10-15T07:31:55.987Z",
+      "end": "2026-10-15T07:32:02.391Z",
+      "command": [
+        "sui",
+        "move",
+        "build",
+        "--build-env",
+        "mainnet",
+        "--silence-warnings",
+        "--no-lint"
+      ],
+      "exitCode": 0
+    }
+  ],
+  "allPassed": true,
+  "noMainnetTransactionByVerifier": true,
+  "limitations": "Consumer compilation proves dependency resolution and public function type checking, not runtime execution, full authorization/invariant testing, audit closure, all historical versions, or all peripheral packages.",
+  "freshlyBuiltDependencyModules": {
+    "allMatch": true,
+    "count": 5,
+    "referenceChainReadAt": "2026-10-15T02:26:45.301Z",
+    "scope": "SHA-256 of freshly MVR-built dependency module BCS versus recorded immutable deployed-package module hashes; no new chain fetch"
+  }
+}

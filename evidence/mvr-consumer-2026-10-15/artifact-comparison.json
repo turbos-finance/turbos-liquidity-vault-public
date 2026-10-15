@@ -1,0 +1,42 @@
+{
+  "project": "vault",
+  "packageId": "0x0ca0dbe2da5ea7c7b0d0d0796e7918413f9328c4e4bf72e2f6bcd8bf3c993c45",
+  "version": "8",
+  "verifiedAt": "2026-10-15T07:35:19.669Z",
+  "referenceChainReadAt": "2026-10-15T02:26:45.301Z",
+  "comparison": "SHA-256 of freshly MVR-built dependency module BCS versus recorded immutable deployed-package module hashes; no new chain fetch",
+  "modules": [
+    {
+      "module": "acl",
+      "sha256": "52651e6e432a5a205a9a658ec84f63015a2b1e3475f313fb85299f0282229063",
+      "deployedSha256": "52651e6e432a5a205a9a658ec84f63015a2b1e3475f313fb85299f0282229063",
+      "match": true
+    },
+    {
+      "module": "config",
+      "sha256": "f62298e6078938148dfff56fe511ab637139757d50f6699fc98b1f3b4c4f3b47",
+      "deployedSha256": "f62298e6078938148dfff56fe511ab637139757d50f6699fc98b1f3b4c4f3b47",
+      "match": true
+    },
+    {
+      "module": "rewarder",
+      "sha256": "08ab830f24d1b889fc2d26f85d12264f1baba8331a06352c91ebb9bc59ec416a",
+      "deployedSha256": "08ab830f24d1b889fc2d26f85d12264f1baba8331a06352c91ebb9bc59ec416a",
+      "match": true
+    },
+    {
+      "module": "router",
+      "sha256": "dda996f132b122e3e519233f1516bdfa87027687e8d192be9ce99712583c3ad4",
+      "deployedSha256": "dda996f132b122e3e519233f1516bdfa87027687e8d192be9ce99712583c3ad4",
+      "match": true
+    },
+    {
+      "module": "vault",
+      "sha256": "9fdc9424db4f823415fc668d3a6e2dadb4f98217710261adc638727143e5c852",
+      "deployedSha256": "9fdc9424db4f823415fc668d3a6e2dadb4f98217710261adc638727143e5c852",
+      "match": true
+    }
+  ],
+  "extras": [],
+  "allMatch": true
+}
