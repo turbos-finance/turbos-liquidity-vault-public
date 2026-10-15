@@ -46,3 +46,7 @@ See [verified build configuration and official source-verification evidence](evi
 ## Public MVR consumer result (2026-10-15)
 
 The owner executed the current-version GitInfo update. The official MVR add and a real-import consumer build both passed using a new empty cache for the validation run. See [consumer logs, manifest, lockfile and results](evidence/mvr-consumer-2026-10-15/README.md). This supersedes the earlier metadata-update-pending status, without changing the source commit recorded in MVR.
+
+## Tests in the current checkout (2026-10-15)
+
+The reviewed test changes are now directly tracked in the source/tests tree: **16 passed, 0 failed**. Run `node tools/test-current.mjs NEW_DISPOSABLE_DIRECTORY`. See [current test code, run instructions and results](evidence/tests-current-2026-10-15/README.md). Production bytecode and MVR source links are unchanged. Historical tools/repro overlays and coverage reports retain their original scope.

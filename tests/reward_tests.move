@@ -167,6 +167,7 @@ module turbos_assets_manage::reward_tests {
             let admin_cap = test_scenario::take_from_sender<AdminCap>(scenario);
             let global_config = test_scenario::take_shared<GlobalConfig>(scenario);
 
+            router::set_package_version(&admin_cap, &mut global_config, 4);
             router::add_operator(
                 &admin_cap, 
                 &mut global_config, 

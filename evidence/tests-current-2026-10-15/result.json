@@ -1,0 +1,41 @@
+{
+  "startedAt": "2026-10-15T07:56:15.447Z",
+  "completedAt": "2026-10-15T07:56:28.321Z",
+  "project": "vault",
+  "toolchain": "sui 1.66.2-a9a6825eaf62",
+  "testFrameworkCommit": "a9a6825eaf6273cc819ee3bcf65fd4909f7624a9",
+  "clmmMetadataCommit": "df4e892dfb970fa6919e589709554fde3fc5fa80",
+  "command": [
+    "sui",
+    "move",
+    "test",
+    "--path",
+    "DISPOSABLE_DIRECTORY",
+    "--build-env",
+    "mainnet",
+    "--silence-warnings",
+    "--no-lint",
+    "--gas-limit",
+    "1000000000",
+    "--threads",
+    "1"
+  ],
+  "exitCode": 0,
+  "diskStopped": false,
+  "timedOut": false,
+  "testResult": {
+    "status": "OK",
+    "total": 16,
+    "passed": 16,
+    "failed": 0
+  },
+  "currentCheckoutSourcesAndTests": true,
+  "sourceAndTestsUnchanged": true,
+  "sourceTreeSha256": "0aef36adbf83f91d768207fad7d1d92c7e0cee874749c16da723c0438154d2ca",
+  "coverageMeasured": false,
+  "scope": "Current-checkout unit tests only; production bytecode verification is separate",
+  "previousPublicHead": "190a21ae4e05f2a1a1d6f00d12bbd0a45a33e148",
+  "notes": "The 11 previously published ACL tests are directly in tests/security_acl_tests.move. Two existing lifecycle fixtures advance the config to version 4 with the existing authorized setter. The pre-existing local deposit test is included after the same fixture correction, full-withdrawal comment correction, and new zero-remaining-assets / bounded positive-output assertions.",
+  "productionBytecodeStillMatches": true,
+  "allAuthorizationAndInvariantCasesCovered": false
+}
