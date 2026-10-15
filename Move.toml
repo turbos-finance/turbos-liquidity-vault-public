@@ -1,12 +1,14 @@
 [package]
 name = "TurbosAssetsManage"
 version = "0.0.4"
-
-[dependencies.TurbosCLMM]
-git = "git@github.com:turbos-finance/turbos-sui-move-interface.git"
-subdir = "clmm"
-rev = "mainnet-v0.1.4"
-#local = "../turbos-sui-move-interface/clmm"
+edition = "legacy"
+implicit-dependencies = false
+published-at = "0x0ca0dbe2da5ea7c7b0d0d0796e7918413f9328c4e4bf72e2f6bcd8bf3c993c45"
 
 [addresses]
-turbos_assets_manage = "0x0"
+turbos_assets_manage = "0x0a0d6e83196f523bb0623187d789ce602d1f63b3e7baa02b580df7ff0ccd17e0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "25804c243d07dd73c0d199e7794383bd855cd436" }
+MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/move-stdlib", rev = "25804c243d07dd73c0d199e7794383bd855cd436" }
+TurbosCLMM = { git = "https://github.com/turbos-finance/turbos-clmm-public.git", subdir = ".", rev = "df4e892dfb970fa6919e589709554fde3fc5fa80" }

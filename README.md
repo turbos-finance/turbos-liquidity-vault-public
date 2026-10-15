@@ -38,3 +38,7 @@ The 2026-09-29 verification matched all modules and the CLMM linkage. Sui 1.49.2
 reported absent linkage entries for system packages `0x3` and `0xb` on the modern node.
 This is retained as a qualified result, not an unconditional PASS. A fresh verification
 with a compatible node/toolchain is still needed. Coverage reports remain outstanding.
+
+## Current-release metadata verification (2026-10-15)
+
+See [verified build configuration and official source-verification evidence](evidence/mvr-source-2026-10-15/README.md). This update does not change production functions. MVR GitInfo update and a fresh-cache registry-consumer run are separate follow-ups.
