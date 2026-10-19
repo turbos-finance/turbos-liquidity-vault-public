@@ -1,0 +1,17 @@
+{
+  "testedAt": "2026-10-19",
+  "toolchain": "Official Sui 1.66.2-a9a6825eaf62",
+  "platformsAttempted": [
+    "macOS arm64",
+    "Linux aarch64 offline restricted container"
+  ],
+  "error": "fatal runtime error: stack overflow, aborting",
+  "rustMinStackBytes": 536870912,
+  "linuxStackLimitBytes": 536870912,
+  "fullSuiteTracingSucceeded": false,
+  "unfilteredTestsPassed": 16,
+  "tracedTests": 13,
+  "filter": "security_acl_tests|turbos_assets_manage::vault::test_",
+  "linuxArchiveSha256": "8223ccd2283f3116151498d1aacbb822d578638266b663eb1df6ce3ef669c6e3",
+  "scope": "No assertions or production code were changed to bypass the failure. Failed diagnostic raw traces/logs are not part of this published successful partial measurement."
+}

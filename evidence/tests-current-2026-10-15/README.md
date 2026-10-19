@@ -1,3 +1,5 @@
+> October 19 update: [regenerated current-tree report](../coverage-2026-10-19/README.md) includes a fresh full unfiltered test run and explicitly partial coverage tracing.
+
 # Tests integrated into the current public checkout — 2026-10-15
 
 **16 passed, 0 failed**. [Result](result.json), [full log](tests.log), [normal-bytecode check](normal-bytecode.json).

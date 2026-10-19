@@ -50,3 +50,7 @@ The owner executed the current-version GitInfo update. The official MVR add and 
 ## Tests in the current checkout (2026-10-15)
 
 The reviewed test changes are now directly tracked in the source/tests tree: **16 passed, 0 failed**. Run `node tools/test-current.mjs NEW_DISPOSABLE_DIRECTORY`. See [current test code, run instructions and results](evidence/tests-current-2026-10-15/README.md). Production bytecode and MVR source links are unchanged. Historical tools/repro overlays and coverage reports retain their original scope.
+
+## Current coverage snapshot (2026-10-19)
+
+All **16/16** current public tests passed unfiltered. Coverage remains **partial (13/16 traced tests)** because full tracing still overflows the stock CLI on macOS and Linux. See [current scope, reports, logs and reproduction](evidence/coverage-2026-10-19/README.md). No production code was changed.

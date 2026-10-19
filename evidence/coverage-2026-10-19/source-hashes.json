@@ -1,0 +1,38 @@
+[
+  {
+    "file": "sources/acl.move",
+    "sha256": "4cd7c468930bee0f85d2243b691e45a6c853361d7a5cdbcaff12e887c2a7cb96"
+  },
+  {
+    "file": "sources/config.move",
+    "sha256": "09d346735d17e6b3dbbc19222c7a65741bca9929b361523bea21c3266993db1b"
+  },
+  {
+    "file": "sources/rewarder.move",
+    "sha256": "ae8a9e156c23733be70f70fef64fd82df661937c3c65ec2705fa2dd3c07e0bb4"
+  },
+  {
+    "file": "sources/router.move",
+    "sha256": "4302b610bf1e896ec9258a024a205b0a08de587b948b70ea188a6b3e03377fb9"
+  },
+  {
+    "file": "sources/vault.move",
+    "sha256": "ad737bff55520cae454400c0de7ac89244be457268fa496b5a62a7009df17cb0"
+  },
+  {
+    "file": "tests/reward_tests.move",
+    "sha256": "1f863af5edc0c99c5fb891adf5cc693f1b3e5c03295dc58abf4bb3ab9d14ada3"
+  },
+  {
+    "file": "tests/security_acl_tests.move",
+    "sha256": "fcbf6f9ed1d73c62fc28827c03e6e93cf2b2d66b856b6b5449f58f398693be45"
+  },
+  {
+    "file": "tests/vault_deposit_tests.move",
+    "sha256": "5dd76e3ffadfbaf558a2f19343ccd66f5877b8db82022158059316162928511a"
+  },
+  {
+    "file": "tests/vault_tests.move",
+    "sha256": "5f90195ea1f58686b217ec18df1fe0aa7e3c4816988ffade502244450476b835"
+  }
+]

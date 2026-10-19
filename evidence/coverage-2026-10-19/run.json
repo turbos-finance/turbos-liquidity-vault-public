@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-10-19T02:25:10.240Z",
+  "project": "vault",
+  "total": 13,
+  "passed": 13,
+  "failed": 0,
+  "coverage": true,
+  "fullSuiteCovered": false,
+  "fullSuiteTraced": false,
+  "fullSuiteTests": 16,
+  "fullSuitePassed": 16,
+  "perTestTraceCount": 13,
+  "allTracedTestsHaveTrace": true,
+  "allPassingTestsHaveTrace": false,
+  "traceRequested": true,
+  "filter": "security_acl_tests|turbos_assets_manage::vault::test_",
+  "sourceAndTestsUnchanged": true,
+  "sourceTreeSha256": "0aef36adbf83f91d768207fad7d1d92c7e0cee874749c16da723c0438154d2ca",
+  "sourceCommit": "fac7f744e52095ec32d1b2ce1a6c494970052a71",
+  "toolchain": "sui 1.66.2-a9a6825eaf62",
+  "platform": "darwin",
+  "threads": 1
+}
